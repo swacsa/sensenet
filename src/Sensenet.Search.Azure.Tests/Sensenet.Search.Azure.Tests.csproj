@@ -60,6 +60,10 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\SearchImpl.Azure\SearchImpl.Azure.csproj">
+      <Project>{E019DEF8-74BF-4117-8755-28DD77D9F565}</Project>
+      <Name>SearchImpl.Azure</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Search\Search.csproj">
       <Project>{0279705B-779D-485D-86B9-F7AB3DD1F2C3}</Project>
       <Name>Search</Name>

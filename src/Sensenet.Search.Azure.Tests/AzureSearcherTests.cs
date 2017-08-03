@@ -1,17 +1,24 @@
-﻿using System.Globalization;
+﻿using System.Collections.Generic;
+using System.Globalization;
 using SenseNet.Search;
 using SenseNet.Search.Parser;
 using SenseNet.Search.Tests.Implementations;
 using Xunit;
+using SenseNet.Search.Azure.Querying.Models;
+using System.Linq;
 
 namespace Sensenet.Search.Azure.Tests
 {
     public class AzureSearcherTests
     {
+        private string SortToString(IList<string >orderBy)
+        {
+            return string.Join(", ", orderBy);
+        }
 
         public void AstTest()
         {
-            SnQuery q;
+            AzureSearchParameters q;
             Test("value", "value");
             Test("VALUE", "VALUE");
             Test("Value", "Value");
@@ -38,7 +45,7 @@ namespace Sensenet.Search.Azure.Tests
             Test("roam~0.8", "roam~0.8");
             Test("\"jakarta apache\"~10");
             Test("mod_date:[20020101 TO 20030101]"); Assert.Equal("mod_date ge 20020101 and mod_date le 20030101", q.Filter);
-            Test("title:{Aida TO Carmen}"); Assert.Equal("title gt 20020101 and title lt 20030101", q.Filter);
+            Test("title:{Aida TO Carmen}"); Assert.Equal("title gt Aida and title lt Carmen", q.Filter);
             Test("jakarta apache");
             Test("jakarta^4 apache");
             Test("\"jakarta apache\"^4 \"Apache Lucene\"");
@@ -63,10 +70,10 @@ namespace Sensenet.Search.Azure.Tests
             q = Test("F1:V1 .TOP:42", "F1:V1"); Assert.Equal(42, q.Top);
             q = Test("F1:V1 .SKIP:42", "F1:V1"); Assert.Equal(42, q.Skip);
             q = Test("F1:V1 .COUNTONLY", "F1:V1"); Assert.Equal(true, q.IncludeTotalResultCount && q.Top == 0);
-            q = Test("F1:V1 .AUTOFILTERS:ON", "F1:V1"); Assert.Equal(FilterStatus.Enabled, q.EnableAutofilters);
-            q = Test("F1:V1 .AUTOFILTERS:OFF", "F1:V1"); Assert.Equal(FilterStatus.Disabled, q.EnableAutofilters);
-            q = Test("F1:V1 .LIFESPAN:ON", "F1:V1"); Assert.Equal(FilterStatus.Enabled, q.EnableLifespanFilter);
-            q = Test("F1:V1 .LIFESPAN:OFF", "F1:V1"); Assert.Equal(FilterStatus.Disabled, q.EnableLifespanFilter);
+            q = Test("F1:V1 .AUTOFILTERS:ON", "F1:V1"); Assert.True(q.EnableAutofilters);
+            q = Test("F1:V1 .AUTOFILTERS:OFF", "F1:V1"); Assert.False(q.EnableAutofilters);
+            q = Test("F1:V1 .LIFESPAN:ON", "F1:V1"); Assert.True(q.EnableLifespanFilter);
+            q = Test("F1:V1 .LIFESPAN:OFF", "F1:V1"); Assert.False(q.EnableLifespanFilter);
             q = Test("F1:V1 .QUICK", "F1:V1");
             q = Test("F1:V1 .SELECT:Name", "F1:V1"); Assert.Equal("Name", q.Select[0]);
             // q.OrderBy.Count <= 32
@@ -90,19 +97,19 @@ namespace Sensenet.Search.Azure.Tests
 
         }
 
-        private SnQuery Test(string queryText, string expected = null)
+        private AzureSearchParameters Test(string queryText, string expected = null)
         {
             var queryContext = new TestQueryContext(QuerySettings.Default, 0, null);
             var parser = new CqlParser();
 
             var snQuery = parser.Parse(queryText, queryContext);
 
-            var visitor = new SenseNet.Search.Parser.SnQueryToStringVisitor();
+            var visitor = new SenseNet.Search.Azure.Querying.SnQueryToAzureQueryVisitor(queryContext);
             visitor.Visit(snQuery.QueryTree);
-            var actualResult = visitor.Output;
+            var actualResult = visitor.Result;
 
-            Assert.Equal(expected ?? queryText, actualResult);
-            return snQuery;
+            Assert.Equal(expected ?? queryText, actualResult.SearchText);
+            return actualResult;
         }
 
     }

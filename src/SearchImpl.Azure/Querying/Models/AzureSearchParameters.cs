@@ -15,7 +15,7 @@ namespace SenseNet.Search.Azure.Querying.Models
         public int? Skip { get; set; }
         public int? Top { get; set; }
         public bool EnableAutofilters { get; set; }
-        public bool EnableLifeSpanFilter { get; set; }
+        public bool EnableLifespanFilter { get; set; }
 
         public static explicit operator SearchParameters(AzureSearchParameters searchParameters)
         {
