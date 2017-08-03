@@ -15,11 +15,43 @@ namespace SenseNet.Search.Azure.Querying
         private StringBuilder _searchText = new StringBuilder();
         private StringBuilder _filter = new StringBuilder();
 
-        public AzureSearchParameters Result => _query;
+        public AzureSearchParameters Result
+        {
+            get
+            {
+                var query = new AzureSearchParameters();
+                query.SearchText = _searchText.ToString();
+                query.Filter = _filter.ToString();
+                //query.IncludeTotalResultCount
+                return query;
+            }
+        }
 
         public SnQueryToAzureQueryVisitor(IQueryContext context)
         {
             _context = context;
+        }
+
+        public override SnQueryPredicate VisitTextPredicate(TextPredicate textPredicate)
+        {
+            var value = (string) Escape(textPredicate.Value);
+            if (textPredicate.FieldName.Substring(0, 1) != "_")
+            {
+                _searchText.Append($"{textPredicate.FieldName}:");
+            }
+            _searchText.Append(value);
+            BoostTostring(_searchText, textPredicate.Boost);
+            FuzzyToString(_searchText, textPredicate.FuzzyValue);
+
+            return base.VisitTextPredicate(textPredicate);
+        }
+
+        private void FuzzyToString(StringBuilder builder, double? fuzzyValue)
+        {
+            if (fuzzyValue.HasValue && fuzzyValue != SnQuery.DefaultFuzzyValue)
+            {
+                builder.Append("~").Append(fuzzyValue.Value.ToString(CultureInfo.InvariantCulture));
+            }
         }
 
         public override SnQueryPredicate VisitRangePredicate(RangePredicate rangePredicate)
@@ -50,6 +82,14 @@ namespace SenseNet.Search.Azure.Querying
             return base.VisitRangePredicate(rangePredicate);
         }
 
+        private void BoostTostring(StringBuilder builder,  double? boost)
+        {
+            if (boost.HasValue && boost != SnQuery.DefaultSimilarity)
+            {
+                builder.Append("^").Append(boost.Value.ToString(CultureInfo.InvariantCulture));
+            }
+        }
+
         //private void BoostTostring(double? boost)
         //{
         //    if (boost.HasValue && boost != SnQuery.DefaultSimilarity)
@@ -58,32 +98,32 @@ namespace SenseNet.Search.Azure.Querying
 
 
         private int _booleanCount;
-        public override SnQueryPredicate VisitBooleanClauseList(BooleanClauseList boolClauseList)
+        public override SnQueryPredicate VisitLogicalPredicate(LogicalPredicate clauseList)
         {
             if (_booleanCount++ > 0)
                 _searchText.Append("(");
-            var list = base.VisitBooleanClauseList(boolClauseList);
+            var list = base.VisitLogicalClauses(clauseList.Clauses);
             if (--_booleanCount > 0)
                 _searchText.Append(")");
-            return list;
+            return clauseList;
         }
 
-        public override List<BooleanClause> VisitBooleanClauses(List<BooleanClause> clauses)
+        public override List<LogicalClause> VisitLogicalClauses(List<LogicalClause> clauses)
         {
             // The list item cannot be rewritten because this class is sealed.
             if (clauses.Count > 0)
             {
-                VisitBooleanClause(clauses[0]);
+                VisitLogicalClause(clauses[0]);
                 for (var i = 1; i < clauses.Count; i++)
                 {
                     _searchText.Append(" ");
-                    VisitBooleanClause(clauses[i]);
+                    VisitLogicalClause(clauses[i]);
                 }
             }
             return clauses;
         }
 
-        public override BooleanClause VisitBooleanClause(BooleanClause clause)
+        public override LogicalClause VisitLogicalClause(LogicalClause clause)
         {
             Visit(clause.Predicate);
             switch (clause.Occur)

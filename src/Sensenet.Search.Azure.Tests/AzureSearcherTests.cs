@@ -16,6 +16,7 @@ namespace Sensenet.Search.Azure.Tests
             return string.Join(", ", orderBy);
         }
 
+        [Fact]
         public void AstTest()
         {
             AzureSearchParameters q;

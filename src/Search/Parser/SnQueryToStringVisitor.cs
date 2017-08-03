@@ -32,7 +32,7 @@ namespace SenseNet.Search.Parser
 
             return base.VisitTextPredicate(textPredicate);
         }
-        private object Escape(object value)
+        public object Escape(object value)
         {
             var stringValue = value as string;
             if (stringValue == null)
@@ -94,32 +94,33 @@ namespace SenseNet.Search.Parser
         }
 
         private int _booleanCount;
-        public override SnQueryPredicate VisitBooleanClauseList(BooleanClauseList boolClauseList)
+        public override SnQueryPredicate VisitLogicalPredicate(LogicalPredicate logic)
         {
             if (_booleanCount++ > 0)
                 _output.Append("(");
-            var list = base.VisitBooleanClauseList(boolClauseList);
+            var list = base.VisitLogicalPredicate(logic);
             if (--_booleanCount > 0)
                 _output.Append(")");
             return list;
         }
 
-        public override List<BooleanClause> VisitBooleanClauses(List<BooleanClause> clauses)
+        //public override List<BooleanClause> VisitBooleanClauses(List<BooleanClause> clauses)
+        public virtual List<LogicalClause> VisitLogicalClauses(List<LogicalClause> clauses)
         {
             // The list item cannot be rewritten because this class is sealed.
             if (clauses.Count > 0)
             {
-                VisitBooleanClause(clauses[0]);
+                VisitLogicalClause(clauses[0]);
                 for (var i = 1; i < clauses.Count; i++)
                 {
                     _output.Append(" ");
-                    VisitBooleanClause(clauses[i]);
+                    VisitLogicalClause(clauses[i]);
                 }
             }
             return clauses;
         }               
 
-        public override BooleanClause VisitBooleanClause(BooleanClause clause)
+        public override LogicalClause VisitLogicalClause(LogicalClause clause)
         {
             switch (clause.Occur)
             {
@@ -127,7 +128,7 @@ namespace SenseNet.Search.Parser
                 case Occurence.MustNot:_output.Append('-');break;
             }
 
-            return base.VisitBooleanClause(clause);
+            return base.VisitLogicalClause(clause);
         }
     }
 }
