@@ -9,6 +9,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SenseNet.Search.Parser;
 using SenseNet.Search.Parser.Predicates;
 using SenseNet.Search.Tests.Implementations;
+using SnQueryToStringVisitor = SenseNet.Search.Tests.Implementations.SnQueryToStringVisitor;
 
 namespace SenseNet.Search.Tests
 {
