@@ -59,6 +59,36 @@ namespace SenseNet.Search.Tests
             Test("title:(+return +\"pink panther\")", "+title:return +title:'pink panther'");
         }
         [TestMethod]
+        public void Search_Parser_AstToString_AdditionalTests()
+        {
+            Test("42value", "_Text:42value");
+            Test("42v?lue", "_Text:42v?lue");
+            Test("42valu*", "_Text:42valu*");
+            Test("Name:42aAa", "Name:42aAa");
+            Test("Name:42a?a");
+            Test("Name:42aa*");
+            Test("(Name:aaa Id:2)", "Name:aaa Id:2"); // unnecessary parenthesis
+            TestError("Name:\"aaa");
+        }
+        [TestMethod]
+        public void Search_Parser_AstToString_EmptyQueries()
+        {
+            var empty = SnQuery.EmptyText;
+            Test($"+(+F1:{empty} +F2:aaa*) +F3:bbb", "+(+F2:aaa*) +F3:bbb");
+            Test($"+(+F1:{empty} +(F2:V2 F3:V3)) +F3:bbb", "+(+(F2:V2 F3:V3)) +F3:bbb");
+            Test($"+(+F1:{empty} +F2:{empty}) +F3:bbb", "+F3:bbb");
+
+            Test($"F1:[{empty} TO max]", "F1:<=max");
+            Test($"F1:[min TO {empty}]", "F1:>=min");
+            Test($"F1:[{empty} TO ]", "");
+            Test($"F1:[ TO {empty}]", "");
+            Test($"F1:[\"{empty}\" TO max]", "F1:<=max");
+            Test($"F1:[min TO \"{empty}\"]", "F1:>=min");
+
+            TestError($"F1:[{empty} TO {empty}]");
+        }
+
+        [TestMethod]
         public void Search_Parser_AstToString_PredicateTypes()
         {
             SnQuery q;
@@ -87,16 +117,50 @@ namespace SenseNet.Search.Tests
         [TestMethod]
         public void Search_Parser_AstToString_CqlExtension_SpecialChars()
         {
+            Test("F1:(V1 OR V2)", "F1:V1 F1:V2");
+            Test("F1:(V1 AND V2)", "+F1:V1 +F1:V2");
+            Test("F1:(+V1 +V2 -V3)", "+F1:V1 +F1:V2 -F1:V3");
+            Test("F1:(+V1 -(V2 V3))", "+F1:V1 -(F1:V2 F1:V3)");
+            Test("F1:(+V1 !V2)", "+F1:V1 -F1:V2");
+
             Test("F1:V1 && F2:V2", "+F1:V1 +F2:V2");
             Test("F1:V1 || F2:V2", "F1:V1 F2:V2");
             Test("F1:V1 && F2:<>V2", "+F1:V1 -F2:V2");
             Test("F1:V1 && !F2:V2", "+F1:V1 -F2:V2");
+            Test("F1:V1 && !(F2:V2 || F3:V3)", "+F1:V1 -(F2:V2 F3:V3)");
+
+            Test("+Id:<1000\n+Name:a*", "+Id:<1000 +Name:a*");
+            Test("Name:\\*", "Name:*");
+            Test("Name:a<a");
+            Test("Name:a>a");
+            Test("Name<aaa", "_Text:Name<aaa");
+            Test("Name>aaa", "_Text:Name>aaa");
+            Test("Name:/root");
+            Test("Number:42.15.78", "Number:42.15. _Text:78");
+
+            Test("Aspect.Field1:aaa");
+            Test("Aspect1.Field1:aaa");
+
+            TestError("42.Field1:aaa");
+            TestError("Name:a* |? Id:<1000");
+            TestError("Name:a* &? Id:<1000");
+            TestError("\"Name\":aaa");
+            TestError("'Name':aaa");
+            TestError("Name:\"aaa\\");
+            TestError("Name:\"aaa\\\"");
+            TestError("Name:<>:");
         }
         [TestMethod]
         public void Search_Parser_AstToString_CqlExtension_Comments()
         {
             Test("F1:V1 //asdf", "F1:V1");
             Test("+F1:V1 /*asdf*/ +F2:V2 /*qwer*/", "+F1:V1 +F2:V2");
+
+            Test("Name:/* \n */aaa", "Name:aaa");
+            Test("+Name:aaa //comment\n+Id:<42", "+Name:aaa +Id:<42");
+            Test("+Name:aaa//comment\n+Id:<42", "+Name:aaa//comment +Id:<42");
+            Test("+Name:\"aaa\"//comment\n+Id:<42", "+Name:aaa +Id:<42");
+            Test("Name:aaa /*unterminatedblockcomment", "Name:aaa");
         }
         [TestMethod]
         public void Search_Parser_AstToString_CqlExtension_Controls()
@@ -136,50 +200,51 @@ namespace SenseNet.Search.Tests
             q = Test("F1:V1 .SORT:F1 .SORT:F2", "F1:V1"); Assert.AreEqual("F1 ASC, F2 ASC", SortToString(q.Sort));
             q = Test("F1:V1 .SORT:F1 .REVERSESORT:F3 .SORT:F2", "F1:V1"); Assert.AreEqual("F1 ASC, F3 DESC, F2 ASC", SortToString(q.Sort));
 
-            TestError("F1:V1 .UNKNOWNKEYWORD", typeof(ParserException));
-            TestError("F1:V1 .TOP", typeof(ParserException));
-            TestError("F1:V1 .TOP:", typeof(ParserException));
-            TestError("F1:V1 .TOP:aaa", typeof(ParserException));
-            TestError("F1:V1 .SKIP", typeof(ParserException));
-            TestError("F1:V1 .SKIP:", typeof(ParserException));
-            TestError("F1:V1 .SKIP:aaa", typeof(ParserException));
-            TestError("F1:V1 .COUNTONLY:", typeof(ParserException));
-            TestError("F1:V1 .COUNTONLY:aaa", typeof(ParserException));
-            TestError("F1:V1 .COUNTONLY:42", typeof(ParserException));
-            TestError("F1:V1 .COUNTONLY:ON", typeof(ParserException));
-            TestError("F1:V1 .AUTOFILTERS", typeof(ParserException));
-            TestError("F1:V1 .AUTOFILTERS:", typeof(ParserException));
-            TestError("F1:V1 .AUTOFILTERS:42", typeof(ParserException));
-            TestError("F1:V1 .LIFESPAN", typeof(ParserException));
-            TestError("F1:V1 .LIFESPAN:", typeof(ParserException));
-            TestError("F1:V1 .LIFESPAN:42", typeof(ParserException));
-            TestError("F1:V1 .QUICK:", typeof(ParserException));
-            TestError("F1:V1 .QUICK:aaa", typeof(ParserException));
-            TestError("F1:V1 .QUICK:42", typeof(ParserException));
-            TestError("F1:V1 .QUICK:ON", typeof(ParserException));
-            TestError("F1:V1 .SORT", typeof(ParserException));
-            TestError("F1:V1 .SORT:", typeof(ParserException));
-            TestError("F1:V1 .SORT:42", typeof(ParserException));
-            TestError("F1:V1 .SELECT", typeof(ParserException));
-            TestError("F1:V1 .SELECT:", typeof(ParserException));
-            TestError("F1:V1 .SELECT:123", typeof(ParserException));
+            TestError("F1:V1 .UNKNOWNKEYWORD");
+            TestError("F1:V1 .TOP");
+            TestError("F1:V1 .TOP:");
+            TestError("F1:V1 .TOP:aaa");
+            TestError("F1:V1 .SKIP");
+            TestError("F1:V1 .SKIP:");
+            TestError("F1:V1 .SKIP:aaa");
+            TestError("F1:V1 .COUNTONLY:");
+            TestError("F1:V1 .COUNTONLY:aaa");
+            TestError("F1:V1 .COUNTONLY:42");
+            TestError("F1:V1 .COUNTONLY:ON");
+            TestError("F1:V1 .AUTOFILTERS");
+            TestError("F1:V1 .AUTOFILTERS:");
+            TestError("F1:V1 .AUTOFILTERS:42");
+            TestError("F1:V1 .LIFESPAN");
+            TestError("F1:V1 .LIFESPAN:");
+            TestError("F1:V1 .LIFESPAN:42");
+            TestError("F1:V1 .QUICK:");
+            TestError("F1:V1 .QUICK:aaa");
+            TestError("F1:V1 .QUICK:42");
+            TestError("F1:V1 .QUICK:ON");
+            TestError("F1:V1 .SORT");
+            TestError("F1:V1 .SORT:");
+            TestError("F1:V1 .SORT:42");
+            TestError("F1:V1 .SELECT");
+            TestError("F1:V1 .SELECT:");
+            TestError("F1:V1 .SELECT:123");
         }
         [TestMethod]
         public void Search_Parser_AstToString_CqlErrors()
         {
-            TestError("", typeof(ParserException));
-            TestError("()", typeof(ParserException));
-            TestError("+(+(Id:1 Id:2) +Name:<b", typeof(ParserException));
-            TestError("Id:(1 2 3", typeof(ParserException));
-            TestError("Password:asdf", typeof(InvalidOperationException));
-            TestError("PasswordHash:asdf", typeof(InvalidOperationException));
-            TestError("Id::1", typeof(ParserException));
-            TestError("Id:[10 to 15]", typeof(ParserException));
-            TestError("Id:[10 TO 15", typeof(ParserException));
-            TestError("Id:[ TO ]", typeof(ParserException));
-            TestError("_Text:\"aaa bbb\"~", typeof(ParserException));
-            TestError("Name:aaa~1.5", typeof(ParserException));
-            TestError("Name:aaa^x", typeof(ParserException));
+            TestError("");
+            TestError("()");
+            TestError("+(+(Id:1 Id:2) +Name:<b");
+            TestError("Id:(1 2 3");
+            TestError("Password:asdf");
+            TestError("PasswordHash:asdf");
+            TestError("Id::1");
+            TestError("Id:[10 to 15]");
+            TestError("Id:[10 TO 15");
+            TestError("Id:[ TO ]");
+            TestError("_Text:\"aaa bbb\"~");
+            TestError("Name:aaa~1.5");
+            TestError("Name:aaa^x");
+            //UNDONE: Nullref exception in this test: Test("Name:()");
         }
 
         private SnQuery Test(string queryText, string expected = null)
@@ -196,11 +261,11 @@ namespace SenseNet.Search.Tests
             Assert.AreEqual(expected ?? queryText, actualResult);
             return snQuery;
         }
-        private void TestError(string queryText, Type expectedExceptionType)
+        private void TestError(string queryText)
         {
             var queryContext = new TestQueryContext(QuerySettings.Default, 0, null);
             var parser = new CqlParser();
-            Exception  thrownException = null;
+            Exception thrownException = null;
             try
             {
                 parser.Parse(queryText, queryContext);
@@ -211,8 +276,6 @@ namespace SenseNet.Search.Tests
             }
             if (thrownException == null)
                 Assert.Fail("Any exception wasn't thrown");
-            if (thrownException.GetType() != expectedExceptionType)
-                Assert.Fail($"{thrownException.GetType().Name} was thrown but {expectedExceptionType.Name} was expected.");
         }
 
         private string SortToString(SortInfo[] sortInfo)
