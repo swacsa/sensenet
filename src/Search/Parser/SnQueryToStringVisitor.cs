@@ -36,9 +36,13 @@ namespace SenseNet.Search.Parser
         {
             var stringValue = value as string;
             if (stringValue == null)
+            {
                 return value;
+            }
             if (_escaperRegex.IsMatch(stringValue))
-                return $"'{stringValue}'";
+            {
+                return $"\"{stringValue}\"";
+            }
             return stringValue;
         }
         private void BoostTostring(double? boost)

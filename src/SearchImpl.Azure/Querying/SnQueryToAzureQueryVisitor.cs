@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using SenseNet.Search.Azure.Querying.Models;
 using SenseNet.Search.Parser;
 using SenseNet.Search.Parser.Predicates;
@@ -14,7 +15,7 @@ namespace SenseNet.Search.Azure.Querying
         private AzureSearchParameters _query = new AzureSearchParameters();
         private StringBuilder _searchText = new StringBuilder();
         private StringBuilder _filter = new StringBuilder();
-
+        private Regex _escaperRegex = new Regex("[+ - && || ! ( ) { } [ ] ^ \" ~ * ? : \\ /]");
         public AzureSearchParameters Result
         {
             get
@@ -34,21 +35,39 @@ namespace SenseNet.Search.Azure.Querying
 
         public override SnQueryPredicate VisitTextPredicate(TextPredicate textPredicate)
         {
-            var value = (string) Escape(textPredicate.Value);
-            if (textPredicate.FieldName.Substring(0, 1) != "_")
+            if (textPredicate.FieldName != "_Text")
             {
-                _searchText.Append($"{textPredicate.FieldName}:");
+                _searchText.Append($"{textPredicate.FieldName.Replace("#", "")}:");
+            }
+            var value = Escape(textPredicate.Value);
+            var phrase = value.WordCount() > 1;
+            if (phrase)
+            {
+                _searchText.Append("\"");
             }
             _searchText.Append(value);
+            if (phrase)
+            {
+                _searchText.Append("\"");
+            }
             BoostTostring(_searchText, textPredicate.Boost);
-            FuzzyToString(_searchText, textPredicate.FuzzyValue);
+            FuzzyToString(_searchText, phrase, textPredicate.FuzzyValue);
 
             return base.VisitTextPredicate(textPredicate);
         }
 
-        private void FuzzyToString(StringBuilder builder, double? fuzzyValue)
+        private string Escape(string value)
         {
-            if (fuzzyValue.HasValue && fuzzyValue != SnQuery.DefaultFuzzyValue)
+            if (_escaperRegex.IsMatch(value))
+            {
+                return $"\"{value}\"";
+            }
+            return value;
+        }
+
+        private void FuzzyToString(StringBuilder builder, bool phrase, double? fuzzyValue)
+        {
+            if (fuzzyValue.HasValue && (phrase || fuzzyValue != SnQuery.DefaultFuzzyValue))
             {
                 builder.Append("~").Append(fuzzyValue.Value.ToString(CultureInfo.InvariantCulture));
             }
@@ -77,8 +96,6 @@ namespace SenseNet.Search.Azure.Querying
                 _filter.Append(rangePredicate.FieldName).Append(op).Append("'").Append(min).Append("'");
             }
 
-            //BoostTostring(rangePredicate.Boost);
-
             return base.VisitRangePredicate(rangePredicate);
         }
 
@@ -90,19 +107,12 @@ namespace SenseNet.Search.Azure.Querying
             }
         }
 
-        //private void BoostTostring(double? boost)
-        //{
-        //    if (boost.HasValue && boost != SnQuery.DefaultSimilarity)
-        //        _filter.Append("^").Append(boost.Value.ToString(CultureInfo.InvariantCulture));
-        //}
-
-
         private int _booleanCount;
         public override SnQueryPredicate VisitLogicalPredicate(LogicalPredicate clauseList)
         {
             if (_booleanCount++ > 0)
                 _searchText.Append("(");
-            var list = base.VisitLogicalClauses(clauseList.Clauses);
+            VisitLogicalClauses(clauseList.Clauses);
             if (--_booleanCount > 0)
                 _searchText.Append(")");
             return clauseList;
@@ -125,24 +135,21 @@ namespace SenseNet.Search.Azure.Querying
 
         public override LogicalClause VisitLogicalClause(LogicalClause clause)
         {
-            Visit(clause.Predicate);
             switch (clause.Occur)
             {
-                case Occurence.Default:
+                case Occurence.Default: break;
+                case Occurence.Should: break;
                 case Occurence.Must:
-                    _searchText.Append("+").Append(clause.Predicate);
+                    _searchText.Append("+");
                     break;
                 case Occurence.MustNot:
-                    _searchText.Append("-").Append(clause.Predicate);
-                    break;
-                case Occurence.Should:
-                    _searchText.Append(clause.Predicate);
+                    _searchText.Append("-");
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(clause.Occur), clause.Occur, null);
-
             }
-            return clause; 
+            Visit(clause.Predicate);
+            return clause;
         }
     }
 }

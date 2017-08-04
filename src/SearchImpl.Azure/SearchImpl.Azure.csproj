@@ -70,6 +70,7 @@
     <Compile Include="Querying\SnQueryToAzureQueryVisitor.cs" />
     <Compile Include="Querying\AzureQueryEngine.cs" />
     <Compile Include="Querying\Models\AzureSearchParameters.cs" />
+    <Compile Include="Querying\StringHelper.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

@@ -9,7 +9,7 @@ using System.Linq;
 
 namespace Sensenet.Search.Azure.Tests
 {
-    public class AzureSearcherTests
+    public class AzureQueryVisitorTests
     {
         private string SortToString(IList<string >orderBy)
         {
@@ -20,16 +20,15 @@ namespace Sensenet.Search.Azure.Tests
         public void AstTest()
         {
             AzureSearchParameters q;
-            Test("value", "value");
-            Test("VALUE", "VALUE");
-            Test("Value", "Value");
-            Test("Value1", "Value1");
-            Test("-Value1", "-Value1");
-            Test("+Value1", "+Value1");
-            Test("Value1 -Value2 +Value3 Value4", "Value1 -Value2 +Value3 Value4");
+            Test("value");
+            Test("VALUE");
+            Test("Value");
+            Test("Value1");
+            Test("-Value1");
+            Test("+Value1");
+            Test("Value1 -Value2 +Value3 Value4");
             Test("Field1:Value1");
-            q = Test("#Field1:Value1");
-            Assert.Equal("Field1/any(v: v eq 'Value1')", q.Filter);
+            Test("#Field1:Value1", "Field1:Value1");
             Test("-Field1:Value1");
             Test("+Field1:Value1");
             Test("Field1:Value1 Field2:Value2 Field3:Value3");
@@ -38,15 +37,15 @@ namespace Sensenet.Search.Azure.Tests
             Test("f1:v1 f2:v2 (f3:v3 f4:v4 (f5:v5 f6:v6))");
             Test("f1:v1 (f2:v2 (f3:v3 f4:v4))");
             Test("aaa AND +bbb", "+aaa +bbb");
-            Test("te?t", "te?t");
-            Test("test*", "test*");
-            //Test("te*t", "te*t");
+            Test("te?t");
+            Test("test*");
+            Test("te*t");
             Test("roam~", "roam");
             Test("roam~" + SnQuery.DefaultFuzzyValue.ToString(CultureInfo.InvariantCulture), "roam");
-            Test("roam~0.8", "roam~0.8");
+            Test("roam~0.8");
             Test("\"jakarta apache\"~10");
-            Test("mod_date:[20020101 TO 20030101]"); Assert.Equal("mod_date ge 20020101 and mod_date le 20030101", q.Filter);
-            Test("title:{Aida TO Carmen}"); Assert.Equal("title gt Aida and title lt Carmen", q.Filter);
+            RangeTest("mod_date:[20020101 TO 20030101]", "mod_date ge 20020101 and mod_date le 20030101");
+            RangeTest("title:{Aida TO Carmen}","title gt Aida and title lt Carmen");
             Test("jakarta apache");
             Test("jakarta^4 apache");
             Test("\"jakarta apache\"^4 \"Apache Lucene\"");
@@ -112,6 +111,22 @@ namespace Sensenet.Search.Azure.Tests
             Assert.Equal(expected ?? queryText, actualResult.SearchText);
             return actualResult;
         }
+
+        private AzureSearchParameters RangeTest(string queryText, string expected = null)
+        {
+            var queryContext = new TestQueryContext(QuerySettings.Default, 0, null);
+            var parser = new CqlParser();
+
+            var snQuery = parser.Parse(queryText, queryContext);
+
+            var visitor = new SenseNet.Search.Azure.Querying.SnQueryToAzureQueryVisitor(queryContext);
+            visitor.Visit(snQuery.QueryTree);
+            var actualResult = visitor.Result;
+
+            Assert.Equal(expected ?? queryText, actualResult.Filter);
+            return actualResult;
+        }
+
 
     }
 }
