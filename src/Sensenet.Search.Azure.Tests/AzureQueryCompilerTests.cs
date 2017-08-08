@@ -6,10 +6,11 @@ using SenseNet.Search.Tests.Implementations;
 using Xunit;
 using SenseNet.Search.Azure.Querying.Models;
 using System.Linq;
+using SenseNet.Search.Azure.Querying;
 
 namespace Sensenet.Search.Azure.Tests
 {
-    public class AzureQueryVisitorTests
+    public class AzureQueryCompilerTests
     {
         private string SortToString(IList<string >orderBy)
         {
@@ -44,8 +45,6 @@ namespace Sensenet.Search.Azure.Tests
             Test("roam~" + SnQuery.DefaultFuzzyValue.ToString(CultureInfo.InvariantCulture), "roam");
             Test("roam~0.8");
             Test("\"jakarta apache\"~10");
-            RangeTest("mod_date:[20020101 TO 20030101]", "mod_date ge 20020101 and mod_date le 20030101");
-            RangeTest("title:{Aida TO Carmen}","title gt Aida and title lt Carmen");
             Test("jakarta apache");
             Test("jakarta^4 apache");
             Test("\"jakarta apache\"^4 \"Apache Lucene\"");
@@ -57,7 +56,7 @@ namespace Sensenet.Search.Azure.Tests
             Test("NOT \"jakarta apache\"", "-\"jakarta apache\"");
             Test("\"jakarta apache\" -\"Apache Lucene\"");
             Test("(jakarta OR apache) AND website", "+(jakarta apache) +website");
-            Test("title:(+return +\"pink panther\")");
+            Test("title:(+return +\"pink panther\")", "+title:return +title:\"pink panther\"");
 
             Test("F1:V1 && F2:V2", "+F1:V1 +F2:V2");
             Test("F1:V1 || F2:V2", "F1:V1 F2:V2");
@@ -66,6 +65,23 @@ namespace Sensenet.Search.Azure.Tests
 
             Test("F1:V1 //asdf", "F1:V1");
             Test("+F1:V1 /*asdf*/ +F2:V2 /*qwer*/", "+F1:V1 +F2:V2");
+
+            RangeTest("mod_date:[20020101 TO 20030101]", "mod_date le '20030101' and mod_date ge '20020101'");
+            RangeTest("title:{Aida TO Carmen}", "title lt 'Carmen' and title gt 'Aida'");
+            RangeTest("title:[Aida TO Carmen}", "title lt 'Carmen' and title ge 'Aida'");
+            RangeTest("title:{Aida TO Carmen]", "title le 'Carmen' and title gt 'Aida'");
+            RangeTest("Name:<aaa", "Name lt 'aaa'");
+            RangeTest("Name:>aaa", "Name gt 'aaa'");
+            RangeTest("Name:<=aaa", "Name le 'aaa'");
+            RangeTest("Name:>=aaa", "Name ge 'aaa'");
+            //RangeTest("Id:<1000", "Id lt 1000");
+            //RangeTest("Id:>1000", "Id gt 1000");
+            //RangeTest("Id:<=1000", "Id le 1000");
+            //RangeTest("Id:>=1000", "Id ge 1000");
+            //RangeTest("Value:<3.14", "Value lt 3.14");
+            //RangeTest("Value:>3.14", "Value gt 3.14");
+            //RangeTest("Value:<=3.14", "Value le 3.14");
+            //RangeTest("Value:>=3.14", "Value ge 3.14");
 
             q = Test("F1:V1 .TOP:42", "F1:V1"); Assert.Equal(42, q.Top);
             q = Test("F1:V1 .SKIP:42", "F1:V1"); Assert.Equal(42, q.Skip);
@@ -82,29 +98,20 @@ namespace Sensenet.Search.Azure.Tests
             q = Test("F1:V1 .SORT:F1 .SORT:F2", "F1:V1"); Assert.Equal("F1, F2", SortToString(q.OrderBy));
             q = Test("F1:V1 .SORT:F1 .REVERSESORT:F3 .SORT:F2", "F1:V1"); Assert.Equal("F1, F3 desc, F2", SortToString(q.OrderBy));
 
-            q = Test("Name:<aaa"); Assert.Equal("Name lt 'aaa'", q.Filter);
-            q = Test("Name:>aaa"); Assert.Equal("Name gt 'aaa'", q.Filter);
-            q = Test("Name:<=aaa"); Assert.Equal("Name le 'aaa'", q.Filter);
-            q = Test("Name:>=aaa"); Assert.Equal("Name ge 'aaa'", q.Filter);
-            q = Test("Id:<1000"); Assert.Equal("Id lt 1000", q.Filter);
-            q = Test("Id:>1000"); Assert.Equal("Id gt 1000", q.Filter);
-            q = Test("Id:<=1000"); Assert.Equal("Id le 1000", q.Filter);
-            q = Test("Id:>=1000"); Assert.Equal("Id ge 1000", q.Filter);
-            q = Test("Value:<3.14"); Assert.Equal("Value lt 3.14", q.Filter);
-            q = Test("Value:>3.14"); Assert.Equal("Value gt 3.14", q.Filter);
-            q = Test("Value:<=3.14"); Assert.Equal("Value le 3.14", q.Filter);
-            q = Test("Value:>=3.14"); Assert.Equal("Value ge 3.14", q.Filter);
 
         }
 
         private AzureSearchParameters Test(string queryText, string expected = null)
         {
-            var queryContext = new TestQueryContext(QuerySettings.Default, 0, null);
+
+            IDictionary<string, IPerFieldIndexingInfo> indexingInfo = null;
+            IQueryContext queryContext = new QueryContext(QuerySettings.Default, 0, indexingInfo);
             var parser = new CqlParser();
-
             var snQuery = parser.Parse(queryText, queryContext);
+            var compiler = new AzureQueryCompiler();
 
-            var visitor = new SenseNet.Search.Azure.Querying.SnQueryToAzureQueryVisitor(queryContext);
+            var azureParameters = compiler.Compile(snQuery, queryContext);
+            var visitor = new SnQueryToAzureQueryVisitor(queryContext, azureParameters);
             visitor.Visit(snQuery.QueryTree);
             var actualResult = visitor.Result;
 
@@ -118,8 +125,10 @@ namespace Sensenet.Search.Azure.Tests
             var parser = new CqlParser();
 
             var snQuery = parser.Parse(queryText, queryContext);
+            var compiler = new AzureQueryCompiler();
 
-            var visitor = new SenseNet.Search.Azure.Querying.SnQueryToAzureQueryVisitor(queryContext);
+            var azureParameters = compiler.Compile(snQuery, queryContext);
+            var visitor = new SnQueryToAzureQueryVisitor(queryContext, azureParameters);
             visitor.Visit(snQuery.QueryTree);
             var actualResult = visitor.Result;
 

@@ -11,6 +11,8 @@ namespace SenseNet.Search.Azure.Querying
 {
     internal class SnQueryToAzureQueryVisitor : SnQueryToStringVisitor
     {
+        private int _booleanCount;
+        private AzureSearchParameters _azureParameters;
         private readonly IQueryContext _context;
         private AzureSearchParameters _query = new AzureSearchParameters();
         private StringBuilder _searchText = new StringBuilder();
@@ -20,17 +22,16 @@ namespace SenseNet.Search.Azure.Querying
         {
             get
             {
-                var query = new AzureSearchParameters();
-                query.SearchText = _searchText.ToString();
-                query.Filter = _filter.ToString();
-                //query.IncludeTotalResultCount
-                return query;
+                _azureParameters.SearchText = _searchText.ToString();
+                _azureParameters.Filter = _filter.ToString();
+                return _azureParameters;
             }
         }
 
-        public SnQueryToAzureQueryVisitor(IQueryContext context)
+        public SnQueryToAzureQueryVisitor(IQueryContext context, AzureSearchParameters azureParameters)
         {
             _context = context;
+            _azureParameters = azureParameters;
         }
 
         public override SnQueryPredicate VisitTextPredicate(TextPredicate textPredicate)
@@ -91,7 +92,7 @@ namespace SenseNet.Search.Azure.Querying
                 op = minExclusive ? " gt " : " ge ";
                 if (max != null)
                 {
-                    _filter.Append(" ");
+                    _filter.Append(" and ");
                 }
                 _filter.Append(rangePredicate.FieldName).Append(op).Append("'").Append(min).Append("'");
             }
@@ -107,15 +108,15 @@ namespace SenseNet.Search.Azure.Querying
             }
         }
 
-        private int _booleanCount;
-        public override SnQueryPredicate VisitLogicalPredicate(LogicalPredicate clauseList)
+
+        public override SnQueryPredicate VisitLogicalPredicate(LogicalPredicate predicate)
         {
             if (_booleanCount++ > 0)
                 _searchText.Append("(");
-            VisitLogicalClauses(clauseList.Clauses);
+            VisitLogicalClauses(predicate.Clauses);
             if (--_booleanCount > 0)
                 _searchText.Append(")");
-            return clauseList;
+            return predicate;
         }
 
         public override List<LogicalClause> VisitLogicalClauses(List<LogicalClause> clauses)

@@ -70,6 +70,7 @@
     <Compile Include="Parser\IQueryContext.cs" />
     <Compile Include="Parser\IQueryParserFactory.cs" />
     <Compile Include="Parser\Predicates\RangePredicate.cs" />
+    <Compile Include="Parser\QueryContext.cs" />
     <Compile Include="Parser\SnQueryPredicate.cs" />
     <Compile Include="Parser\ISnQueryParser.cs" />
     <Compile Include="Parser\CqlLexer.cs" />
