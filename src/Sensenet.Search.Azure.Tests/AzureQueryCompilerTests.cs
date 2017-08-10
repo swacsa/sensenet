@@ -12,13 +12,9 @@ namespace Sensenet.Search.Azure.Tests
 {
     public class AzureQueryCompilerTests
     {
-        private string SortToString(IList<string >orderBy)
-        {
-            return string.Join(", ", orderBy);
-        }
 
         [Fact]
-        public void AstTest()
+        public void AzureCompilerTest()
         {
             AzureSearchParameters q;
             Test("value");
@@ -74,29 +70,28 @@ namespace Sensenet.Search.Azure.Tests
             RangeTest("Name:>aaa", "Name gt 'aaa'");
             RangeTest("Name:<=aaa", "Name le 'aaa'");
             RangeTest("Name:>=aaa", "Name ge 'aaa'");
-            //RangeTest("Id:<1000", "Id lt 1000");
-            //RangeTest("Id:>1000", "Id gt 1000");
-            //RangeTest("Id:<=1000", "Id le 1000");
-            //RangeTest("Id:>=1000", "Id ge 1000");
-            //RangeTest("Value:<3.14", "Value lt 3.14");
-            //RangeTest("Value:>3.14", "Value gt 3.14");
-            //RangeTest("Value:<=3.14", "Value le 3.14");
-            //RangeTest("Value:>=3.14", "Value ge 3.14");
+            RangeTest("Id:<1000", "Id lt 1000");
+            RangeTest("Id:>1000", "Id gt 1000");
+            RangeTest("Id:<=1000", "Id le 1000");
+            RangeTest("Id:>=1000", "Id ge 1000");
+            RangeTest("Value:<3.14", "Value lt 3.14");
+            RangeTest("Value:>3.14", "Value gt 3.14");
+            RangeTest("Value:<=3.14", "Value le 3.14");
+            RangeTest("Value:>=3.14", "Value ge 3.14");
 
             q = Test("F1:V1 .TOP:42", "F1:V1"); Assert.Equal(42, q.Top);
             q = Test("F1:V1 .SKIP:42", "F1:V1"); Assert.Equal(42, q.Skip);
-            q = Test("F1:V1 .COUNTONLY", "F1:V1"); Assert.Equal(true, q.IncludeTotalResultCount && q.Top == 0);
+            q = Test("F1:V1 .COUNTONLY", "F1:V1"); Assert.Equal(true, q.IncludeTotalResultCount && q.Top == int.MaxValue);
             q = Test("F1:V1 .AUTOFILTERS:ON", "F1:V1"); Assert.True(q.EnableAutofilters);
             q = Test("F1:V1 .AUTOFILTERS:OFF", "F1:V1"); Assert.False(q.EnableAutofilters);
             q = Test("F1:V1 .LIFESPAN:ON", "F1:V1"); Assert.True(q.EnableLifespanFilter);
             q = Test("F1:V1 .LIFESPAN:OFF", "F1:V1"); Assert.False(q.EnableLifespanFilter);
             q = Test("F1:V1 .QUICK", "F1:V1");
-            q = Test("F1:V1 .SELECT:Name", "F1:V1"); Assert.Equal("Name", q.Select[0]);
-            // q.OrderBy.Count <= 32
+            q = Test("F1:V1 .SELECT:Name,Id", "F1:V1"); Assert.Equal("Name", q.Select[0]); Assert.Equal("Id", q.Select[1]);
             q = Test("F1:V1 .SORT:F1", "F1:V1"); Assert.Equal("F1", q.OrderBy[0]);
             q = Test("F1:V1 .REVERSESORT:F1", "F1:V1"); Assert.Equal("F1 desc", q.OrderBy[0]);
-            q = Test("F1:V1 .SORT:F1 .SORT:F2", "F1:V1"); Assert.Equal("F1, F2", SortToString(q.OrderBy));
-            q = Test("F1:V1 .SORT:F1 .REVERSESORT:F3 .SORT:F2", "F1:V1"); Assert.Equal("F1, F3 desc, F2", SortToString(q.OrderBy));
+            q = Test("F1:V1 .SORT:F1 .SORT:F2", "F1:V1"); Assert.Equal("F1", q.OrderBy[0]); Assert.Equal("F2", q.OrderBy[1]);
+            q = Test("F1:V1 .SORT:F1 .REVERSESORT:F3 .SORT:F2", "F1:V1"); Assert.Equal("F1", q.OrderBy[0]); Assert.Equal("F3 desc", q.OrderBy[1]); Assert.Equal("F2", q.OrderBy[2]);
 
 
         }
@@ -104,16 +99,16 @@ namespace Sensenet.Search.Azure.Tests
         private AzureSearchParameters Test(string queryText, string expected = null)
         {
 
-            IDictionary<string, IPerFieldIndexingInfo> indexingInfo = null;
+            IDictionary<string, IPerFieldIndexingInfo> indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>();
+            indexingInfo.Add("Id", new TestPerfieldIndexingInfoInt());
+            indexingInfo.Add("Name", new TestPerfieldIndexingInfoString());
+            indexingInfo.Add("Value", new TestPerfieldIndexingInfoSingle());
             IQueryContext queryContext = new QueryContext(QuerySettings.Default, 0, indexingInfo);
             var parser = new CqlParser();
             var snQuery = parser.Parse(queryText, queryContext);
             var compiler = new AzureQueryCompiler();
 
-            var azureParameters = compiler.Compile(snQuery, queryContext);
-            var visitor = new SnQueryToAzureQueryVisitor(queryContext, azureParameters);
-            visitor.Visit(snQuery.QueryTree);
-            var actualResult = visitor.Result;
+            var actualResult = compiler.Compile(snQuery, queryContext);
 
             Assert.Equal(expected ?? queryText, actualResult.SearchText);
             return actualResult;
@@ -121,16 +116,16 @@ namespace Sensenet.Search.Azure.Tests
 
         private AzureSearchParameters RangeTest(string queryText, string expected = null)
         {
-            var queryContext = new TestQueryContext(QuerySettings.Default, 0, null);
+            IDictionary<string, IPerFieldIndexingInfo> indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>();
+            indexingInfo.Add("Id", new TestPerfieldIndexingInfoInt());
+            indexingInfo.Add("Name", new TestPerfieldIndexingInfoString());
+            indexingInfo.Add("Value", new TestPerfieldIndexingInfoSingle());
+            IQueryContext queryContext = new QueryContext(QuerySettings.Default, 0, indexingInfo);
             var parser = new CqlParser();
-
             var snQuery = parser.Parse(queryText, queryContext);
             var compiler = new AzureQueryCompiler();
 
-            var azureParameters = compiler.Compile(snQuery, queryContext);
-            var visitor = new SnQueryToAzureQueryVisitor(queryContext, azureParameters);
-            visitor.Visit(snQuery.QueryTree);
-            var actualResult = visitor.Result;
+            var actualResult = compiler.Compile(snQuery, queryContext);
 
             Assert.Equal(expected ?? queryText, actualResult.Filter);
             return actualResult;

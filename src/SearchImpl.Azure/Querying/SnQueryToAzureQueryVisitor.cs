@@ -80,12 +80,21 @@ namespace SenseNet.Search.Azure.Querying
             var max = rangePredicate.Max;
             var minExclusive = rangePredicate.MinExclusive;
             var maxExclusive = rangePredicate.MaxExclusive;
+            var isNumeric = IsNumeric(rangePredicate.FieldName);
             string op;
 
             if (max != null)
             {
                 op = maxExclusive ? " lt " : " le ";
-                _filter.Append(rangePredicate.FieldName).Append(op).Append("'").Append(max).Append("'");
+                _filter.Append(rangePredicate.FieldName).Append(op);
+                if (isNumeric)
+                {
+                    _filter.Append(max);
+                }
+                else
+                {
+                    _filter.Append("'").Append(max).Append("'");
+                }
             }
             if (min != null)
             {
@@ -94,10 +103,49 @@ namespace SenseNet.Search.Azure.Querying
                 {
                     _filter.Append(" and ");
                 }
-                _filter.Append(rangePredicate.FieldName).Append(op).Append("'").Append(min).Append("'");
+                _filter.Append(rangePredicate.FieldName).Append(op);
+                if (isNumeric)
+                {
+                    _filter.Append(min);
+                }
+                else
+                {
+                    _filter.Append("'").Append(min).Append("'");
+                }
             }
 
             return base.VisitRangePredicate(rangePredicate);
+        }
+
+        private bool IsNumeric(string fieldName)
+        {
+            IPerFieldIndexingInfo info;
+            try
+            {
+                info = _context.GetPerFieldIndexingInfo(fieldName);
+            }
+            catch
+            {
+                return false;
+            }
+            if (info == null)
+            {
+                return false;
+            }
+            bool result;
+            switch (info.FieldDataType.Name)
+            {
+                case "Int32":
+                case "Int64":
+                case "Single":
+                case "Double":
+                    result = true;
+                    break;
+                default:
+                    result = false;
+                    break;
+            }
+            return result;
         }
 
         private void BoostTostring(StringBuilder builder,  double? boost)
