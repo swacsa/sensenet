@@ -11,11 +11,10 @@ namespace SenseNet.Search.Azure.Querying
         {
             var parameters = new AzureSearchParameters();
             parameters.Skip = query.Skip;
-            parameters.Top = query.Top;
+            parameters.Top = query.CountOnly ? 0 : query.Top;
             parameters.EnableAutofilters = query.EnableAutofilters == FilterStatus.Enabled;
             parameters.EnableLifespanFilter = query.EnableLifespanFilter == FilterStatus.Enabled;
-            //parameters.Facets = 
-            parameters.IncludeTotalResultCount = query.CountOnly;
+            parameters.IncludeTotalResultCount = true;
             if (query.Projection != null)
             {
                 var fields = query.Projection.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries);
