@@ -24,6 +24,7 @@ using SenseNet.ContentRepository.Schema;
 using SenseNet.ContentRepository.Storage.Security;
 using SenseNet.Search;
 using SenseNet.Search.Indexing;
+using SenseNet.Search.Lucene29;
 using SenseNet.Tools;
 
 namespace SenseNet.ContentRepository
@@ -179,7 +180,7 @@ namespace SenseNet.ContentRepository
             }
             ConsoleWriteLine("Starting LuceneManager:");
 
-            LuceneManager.Start(_settings.Console);
+            IndexManager.Start(new DefaultIndexingEngineFactory(), _settings.Console);
 
             ConsoleWriteLine("LuceneManager has started.");
         }
@@ -454,7 +455,7 @@ namespace SenseNet.ContentRepository
                 if (LuceneManagerIsRunning)
                 {
                     SnTrace.Repository.Write("Shutting down LuceneManager.");
-                    LuceneManager.ShutDown();
+                    IndexManager.ShutDown();
                 }
 
                 SnTrace.Repository.Write("Waiting for writer lock file is released.");
@@ -512,7 +513,7 @@ namespace SenseNet.ContentRepository
             // check if writer.lock is still there -> if yes, wait for other appdomain to quit or lock to disappear - until a given timeout.
             // after timeout is passed, Repository.Start will deliberately attempt to remove lock file on following startup
 
-            if (!IndexManager.WaitForWriterLockFileIsReleased())
+            if (!Lucene29IndexManager.WaitForWriterLockFileIsReleased())
             {
                 // lock file was not removed by other or current appdomain for the given time interval (onstart: other appdomain might use it, onend: current appdomain did not release it yet)
                 // onstart -> notify operator and start repository anyway
@@ -566,7 +567,7 @@ namespace SenseNet.ContentRepository
             {
                 if (_instance == null)
                     throw new NotSupportedException("Querying running state of LuceneManager is not supported when RepositoryInstance is not created.");
-                return LuceneManager.Running;
+                return IndexManager.Running;
             }
         }
         public static bool IndexingPaused

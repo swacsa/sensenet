@@ -19,7 +19,8 @@ namespace SenseNet.ContentRepository.Storage.Search
         string Name { get; }
         bool IsInIndex { get; }
         bool IsBinaryField { get; }
-        IEnumerable<IIndexFieldInfo> GetIndexFieldInfos(out string textExtract);
+        IEnumerable<IIndexFieldInfo> GetIndexFieldInfos(out string textExtract); //UNDONE:!!!!!!!!! DELETE GetIndexFieldInfos
+        IEnumerable<IndexField> GetIndexFields(out string textExtract); //UNDONE:!!!!!!!!! GetIndexFieldInfos -> GetIndexField
     }
     public interface IIndexValueConverter<T>
     {
@@ -30,13 +31,12 @@ namespace SenseNet.ContentRepository.Storage.Search
         object GetBack(string fieldValue);
     }
 
-
-
     public interface IIndexDocumentProvider
     {
-        object GetIndexDocumentInfo(Node node, bool skipBinaries, bool isNew, out bool hasBinary);
-        object CompleteIndexDocumentInfo(Node node, object baseDocumentInfo);
+        IndexDocument GetIndexDocument(Node node, bool skipBinaries, bool isNew, out bool hasBinary);
+        IndexDocument CompleteIndexDocument(Node node, IndexDocument baseDocument);
     }
+
     public interface ISearchEngine
     {
         bool IndexingPaused { get; }
@@ -44,13 +44,11 @@ namespace SenseNet.ContentRepository.Storage.Search
         void ContinueIndexing();
         void WaitIfIndexingPaused();
 
-        IIndexPopulator GetPopulator();
+        IIndexPopulator GetPopulator(); //UNDONE: not SearchEngine responsibility: GetPopulator()
 
         IDictionary<string, Type> GetAnalyzers();
 
         void SetIndexingInfo(object indexingInfo);
-
-        object DeserializeIndexDocumentInfo(byte[] IndexDocumentInfoBytes);
     }
     public class InternalSearchEngine : ISearchEngine
     {
@@ -81,10 +79,6 @@ namespace SenseNet.ContentRepository.Storage.Search
         public void SetIndexingInfo(object indexingInfo)
         {
             // do nothing
-        }
-        public object DeserializeIndexDocumentInfo(byte[] IndexDocumentInfoBytes)
-        {
-            return null;
         }
     }
 

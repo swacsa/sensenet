@@ -25,7 +25,6 @@ namespace SenseNet.ContentRepository
 
         public IPerFieldIndexingInfo GetPerFieldIndexingInfo(string fieldName)
         {
-            var ensureStart = ContentTypeManager.Current;
             return ContentTypeManager.GetPerFieldIndexingInfo(fieldName);
         }
 

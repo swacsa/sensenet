@@ -9,6 +9,7 @@ using SenseNet.Configuration;
 using SenseNet.ContentRepository.Storage.Search.Internal;
 using SenseNet.ContentRepository.Storage.Schema;
 using SenseNet.Diagnostics;
+using SenseNet.Search;
 using SenseNet.Tools;
 
 namespace SenseNet.ContentRepository.Storage.Data
@@ -73,7 +74,7 @@ namespace SenseNet.ContentRepository.Storage.Data
         }
         protected abstract int GetPermissionLogEntriesCountAfterMomentInternal(DateTime moment);
 
-        internal abstract AuditLogEntry[] LoadLastAuditLogEntries(int count);
+        protected internal abstract AuditLogEntry[] LoadLastAuditLogEntries(int count);
 
 
         //////////////////////////////////////// Generic Datalayer Logic ////////////////////////////////////////
@@ -603,72 +604,4 @@ namespace SenseNet.ContentRepository.Storage.Data
         protected internal abstract void ReleaseTreeLock(int[] lockIds);
         protected internal abstract Dictionary<int, string> LoadAllTreeLocks();
     }
-
-    public class QueryPropertyData
-    {
-        public string PropertyName { get; set; }
-        public object Value { get; set; }
-
-        private Operator _queryOperator = Operator.Equal;
-        public Operator QueryOperator
-        {
-            get { return _queryOperator; }
-            set { _queryOperator = value; }
-        }
-    }
-
-    [Serializable]
-    public class IndexDocumentData
-    {
-        [NonSerialized] private object _indexDocumentInfo;
-        public object IndexDocumentInfo
-        {
-            get
-            {
-                if (_indexDocumentInfo == null)
-                    _indexDocumentInfo = StorageContext.Search.SearchEngine.DeserializeIndexDocumentInfo(IndexDocumentInfoBytes);
-                return _indexDocumentInfo;
-            }
-        }
-
-        private byte[] _indexDocumentInfoBytes;
-        public byte[] IndexDocumentInfoBytes
-        {
-            get
-            {
-                if (_indexDocumentInfoBytes == null)
-                {
-                    using (var docStream = new MemoryStream())
-                    {
-                        var formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
-                        formatter.Serialize(docStream, _indexDocumentInfo);
-                        docStream.Flush();
-                        IndexDocumentInfoSize = docStream.Length;
-                        _indexDocumentInfoBytes = docStream.GetBuffer();
-                    }
-                }
-                return _indexDocumentInfoBytes;
-            }
-
-        }
-        public long? IndexDocumentInfoSize { get; set; }
-
-        public int NodeTypeId { get; set; }
-        public int VersionId { get; set; }
-        public int NodeId { get; set; }
-        public string Path { get; set; }
-        public int ParentId { get; set; }
-        public bool IsSystem { get; set; }
-        public bool IsLastDraft { get; set; }
-        public bool IsLastPublic { get; set; }
-        public long NodeTimestamp { get; set; }
-        public long VersionTimestamp { get; set; }
-
-        public IndexDocumentData(object indexDocumentInfo, byte[] indexDocumentInfoBytes)
-        {
-            _indexDocumentInfo = indexDocumentInfo;
-            _indexDocumentInfoBytes = indexDocumentInfoBytes;
-        }
-    }
-
 }

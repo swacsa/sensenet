@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -13,6 +14,7 @@ namespace SenseNet.Search
 
     public enum IndexableDataType { String, Int, Long, Float, Double }
     public enum IndexFieldType { String, Int, Long, Float, Double, DateTime }
+    public enum SnTermType { String, StringArray, Bool, Int, Long, Float, Double, DateTime }
     public enum FieldInfoType { StringField, IntField, LongField, SingleField, DoubleField }
 
     public interface ISnField
@@ -37,9 +39,11 @@ namespace SenseNet.Search
         IndexFieldType IndexFieldType { get; }
         IPerFieldIndexingInfo OwnerIndexingInfo { get; set; }
         string GetSortFieldName(string fieldName);
-        IEnumerable<IIndexFieldInfo> GetIndexFieldInfos(ISnField field, out string textExtract);
+
+        IEnumerable<IIndexFieldInfo> GetIndexFieldInfos(ISnField field, out string textExtract); //UNDONE:!!!! obsolete: DELETE ASAP
+        IEnumerable<IndexField> GetIndexFields(ISnField field, out string textExtract);
     }
-    public interface IIndexFieldInfo //UNDONE: Racionalize interface names: IPerFieldIndexingInfo and IIndexFieldInfo
+    public interface IIndexFieldInfo //UNDONE:!!!! obsolete: DELETE ASAP
     {
         string Name { get; }
         string Value { get; }
@@ -48,7 +52,7 @@ namespace SenseNet.Search
         IndexStoringMode Store { get; }
         IndexTermVector TermVector { get; }
     }
-    public interface IPerFieldIndexingInfo //UNDONE: Racionalize interface names: IPerFieldIndexingInfo and IIndexFieldInfo
+    public interface IPerFieldIndexingInfo //UNDONE: Racionalize interface names: IPerFieldIndexingInfo
     {
         string Analyzer { get; set; }
         IFieldIndexHandler IndexFieldHandler { get; set; }

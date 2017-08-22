@@ -1,23 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using Lucene.Net.Analysis;
-using Lucene.Net.Documents;
-using Lucene.Net.Index;
-using Lucene.Net.Store;
 using SenseNet.Diagnostics;
 using SenseNet.ContentRepository.Storage;
-using SenseNet.ContentRepository.Storage.Schema;
 using SenseNet.ContentRepository.Storage.Search;
-using Lucene.Net.Search;
-using Lucene.Net.Util;
 using SenseNet.Search.Indexing.Activities;
-using SenseNet.ContentRepository;
-using SenseNet.Communication.Messaging;
-using System.Diagnostics;
 using System.IO;
+using Lucene.Net.Index;
 using SenseNet.ContentRepository.Storage.Data;
+using SenseNet.Search.Lucene29;
 
 namespace SenseNet.Search.Indexing
 {
@@ -43,44 +34,26 @@ namespace SenseNet.Search.Indexing
         // caller: IndexPopulator.Populator, Import.Importer, Tests.Initializer, RunOnce
         public void ClearAndPopulateAll(bool backup = true, TextWriter consoleWriter = null)
         {
-            var lastActivityId = LuceneManager.GetLastStoredIndexingActivityId();
-            var commitData = CompletionState.GetCommitUserData(lastActivityId);
+            var lastActivityId = IndexManager.GetLastStoredIndexingActivityId();
 
             using (var op = SnTrace.Index.StartOperation("IndexPopulator ClearAndPopulateAll"))
             {
                 // recreate
-                var writer = IndexManager.GetIndexWriter(true);
-                try
-                {
-                    var excludedNodeTypes = LuceneManager.GetNotIndexedNodeTypes();
-                    foreach (var docData in StorageContext.Search.LoadIndexDocumentsByPath("/Root", excludedNodeTypes))
-                    {
-                        var doc = IndexDocumentInfo.GetDocument(docData);
-                        if (doc == null) // indexing disabled
-                            continue;
-                        writer.AddDocument(doc);
-                        OnNodeIndexed(docData.Path);
-                    }
-                    consoleWriter?.Write("  Commiting ... ");
-                    writer.Commit(commitData);
-                    consoleWriter?.WriteLine("ok");
-                    consoleWriter?.Write("  Optimizing ... ");
-                    writer.Optimize();
-                    consoleWriter?.WriteLine("ok");
-                }
-                finally
-                {
-                    writer.Close();
-                }
-                consoleWriter?.Write("  Deleting indexing activities ... ");
-                LuceneManager.DeleteAllIndexingActivities();
+                IndexManager.IndexingEngine.Actualize(null,
+                    StorageContext.Search.LoadIndexDocumentsByPath("/Root", IndexManager.GetNotIndexedNodeTypes())
+                        .Select(d =>
+                        {
+                            var indexDoc = IndexManager.CreateIndexDocument(d.IndexDocument, d); //UNDONE: refactor IndexDocumentData --> complete IndexDocument
+                            OnNodeIndexed(d.Path);
+                            return indexDoc;
+                        }));
+
+                consoleWriter?.Write("  Commiting ... ");
+                IndexManager.Commit(lastActivityId);
                 consoleWriter?.WriteLine("ok");
-                if (backup)
-                {
-                    consoleWriter?.Write("  Making backup ... ");
-                    BackupTools.BackupIndexImmediatelly();
-                    consoleWriter?.WriteLine("ok");
-                }
+
+                consoleWriter?.Write("  Deleting indexing activities ... ");
+                IndexManager.DeleteAllIndexingActivities();
                 op.Successful = true;
             }
         }
@@ -90,25 +63,9 @@ namespace SenseNet.Search.Indexing
         {
             using (var op = SnTrace.Index.StartOperation("IndexPopulator RepopulateTree"))
             {
-                var writer = IndexManager.GetIndexWriter(false);
-                writer.DeleteDocuments(new Term(IndexFieldName.InTree, path.ToLowerInvariant()));
-                try
-                {
-                    var excludedNodeTypes = LuceneManager.GetNotIndexedNodeTypes();
-                    foreach (var docData in StorageContext.Search.LoadIndexDocumentsByPath(path, excludedNodeTypes))
-                    {
-                        var doc = IndexDocumentInfo.GetDocument(docData);
-                        if (doc == null) // indexing disabled
-                            continue;
-                        writer.AddDocument(doc);
-                        OnNodeIndexed(docData.Path);
-                    }
-                    writer.Optimize();
-                }
-                finally
-                {
-                    writer.Close();
-                }
+                IndexManager.IndexingEngine.Actualize(new[] {new SnTerm(IndexFieldName.InTree, path)},
+                    StorageContext.Search.LoadIndexDocumentsByPath(path, IndexManager.GetNotIndexedNodeTypes())
+                        .Select(d => IndexManager.CreateIndexDocument(d.IndexDocument, d))); //UNDONE: refactor IndexDocumentData --> complete IndexDocument
                 op.Successful = true;
             }
         }
@@ -217,25 +174,6 @@ namespace SenseNet.Search.Indexing
             foreach (var head in NodeHead.Get(pathSet))
                 DeleteTree(head.Path, head.Id, moveOrRename);
         }
-
-        #region Obsolete API
-        [Obsolete("This API is prohibited due to the poor performance. Use RebuildIndex method instead.", true)]
-        public void RefreshIndexDocumentInfo(IEnumerable<Node> nodes)
-        {
-        }
-        [Obsolete("This API is prohibited due to the poor performance. Use RebuildIndex method instead.", true)]
-        public void RefreshIndexDocumentInfo(Node node, bool recursive)
-        {
-        }
-        [Obsolete("This API is prohibited due to the poor performance. Use RebuildIndex method instead.", true)]
-        public void RefreshIndex(IEnumerable<Node> nodes)
-        {
-        }
-        [Obsolete("This API is prohibited due to the poor performance. Use RebuildIndex method instead.", true)]
-        public void RefreshIndex(Node node, bool recursive)
-        {
-        }
-        #endregion
 
         public void RebuildIndex(Node node, bool recursive = false, IndexRebuildLevel rebuildLevel = IndexRebuildLevel.IndexOnly)
         {
@@ -371,8 +309,8 @@ namespace SenseNet.Search.Indexing
         }
         private static void ExecuteActivity(LuceneIndexingActivity activity)
         {
-            LuceneManager.RegisterActivity(activity);
-            LuceneManager.ExecuteActivity(activity, true, true);
+            IndexManager.RegisterActivity(activity);
+            IndexManager.ExecuteActivity(activity, true, true);
         }
     }
 }

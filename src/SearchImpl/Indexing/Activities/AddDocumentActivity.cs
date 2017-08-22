@@ -18,13 +18,7 @@ namespace SenseNet.Search.Indexing.Activities
     {
         protected override bool ProtectedExecute()
         {
-            if (Document != null)
-            {
-                if (true == this.SingleVersion)
-                    return LuceneManager.AddCompleteDocument(Document, Id, IsUnprocessedActivity, Versioning);
-                return LuceneManager.AddDocument(Document, Id, IsUnprocessedActivity, Versioning);
-            }
-            return LuceneManager.AddDocument(Id, IsUnprocessedActivity, Versioning);
+            return IndexManager.AddDocument(Document, Versioning);
         }
     }
 }

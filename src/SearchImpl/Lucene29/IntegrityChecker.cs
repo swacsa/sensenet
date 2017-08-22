@@ -14,8 +14,9 @@ using SenseNet.ContentRepository.Storage;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using SenseNet.Diagnostics;
+using SenseNet.Search.Lucene29;
 
-namespace SenseNet.Search.Indexing
+namespace SenseNet.Search.Lucene29
 {
     public enum IndexDifferenceKind { NotInIndex, NotInDatabase, MoreDocument, DifferentNodeTimestamp, DifferentVersionTimestamp, DifferentLastPublicFlag, DifferentLastDraftFlag }
 
@@ -113,10 +114,11 @@ namespace SenseNet.Search.Indexing
     {
         public static object CheckIndexIntegrity(string contentPath, bool recurse)
         {
-            CompletionState completionState;
-            using (var readerFrame = LuceneManager.GetIndexReaderFrame())
-                completionState = CompletionState.ParseFromReader(readerFrame.IndexReader);
-            var lastDatabaseId = LuceneManager.GetLastStoredIndexingActivityId();
+            var completionState = IndexManager.IndexingEngine.ReadActivityStatusFromIndex();
+            if(completionState == null)
+                throw new NotSupportedException("Index Integrity Checker cannot read activity status from index.");
+
+            var lastDatabaseId = IndexManager.GetLastStoredIndexingActivityId();
 
             var channel = SenseNet.ContentRepository.DistributedApplication.ClusterChannel;
             var appDomainName = channel == null ? null : channel.ReceiverName;
@@ -126,7 +128,7 @@ namespace SenseNet.Search.Indexing
                 AppDomainName = appDomainName,
                 LastStoredActivity = lastDatabaseId,
                 LastProcessedActivity = completionState.LastActivityId,
-                GapsLength = completionState.GapsLength,
+                GapsLength = completionState.Gaps?.Length ?? 0,
                 Gaps = completionState.Gaps,
                 Differences = Check(contentPath, recurse)
             };
@@ -153,7 +155,7 @@ namespace SenseNet.Search.Indexing
         private IEnumerable<Difference> CheckNode(string path)
         {
             var result = new List<Difference>();
-            using (var readerFrame = LuceneManager.GetIndexReaderFrame())
+            using (var readerFrame = IndexReaderFrame.GetReaderFrame())
             {
                 var ixreader = readerFrame.IndexReader;
                 var docids = new List<int>();
@@ -199,7 +201,7 @@ namespace SenseNet.Search.Indexing
 
             using (var op = SnTrace.Index.StartOperation("Index Integrity Checker: CheckRecurse {0}", path))
             {
-                using (var readerFrame = LuceneManager.GetIndexReaderFrame())
+                using (var readerFrame = IndexReaderFrame.GetReaderFrame())
                 {
                     var ixreader = readerFrame.IndexReader;
                     numdocs = ixreader.NumDocs() + ixreader.NumDeletedDocs();
@@ -428,7 +430,7 @@ namespace SenseNet.Search.Indexing
             var field = recurse ? "InTree" : "Path";
             var lq = LucQuery.Parse(String.Format("{0}:'{1}'", field, path.ToLower()));
 
-            using (var readerFrame = LuceneManager.GetIndexReaderFrame())
+            using (var readerFrame = IndexReaderFrame.GetReaderFrame())
             {
                 var idxReader = readerFrame.IndexReader;
                 var searcher = new IndexSearcher(idxReader);

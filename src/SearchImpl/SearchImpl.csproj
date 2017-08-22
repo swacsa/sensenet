@@ -41,8 +41,8 @@
       <HintPath>..\packages\Newtonsoft.Json.9.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="SenseNet.Security, Version=2.3.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\SenseNet.Security.2.3.0.0\lib\net45\SenseNet.Security.dll</HintPath>
+    <Reference Include="SenseNet.Security, Version=2.3.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\SenseNet.Security.2.3.1\lib\net45\SenseNet.Security.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="SenseNet.Tools, Version=2.1.1.0, Culture=neutral, processorArchitecture=MSIL">
@@ -62,6 +62,7 @@
     <Compile Include="Configuration\Querying.cs" />
     <Compile Include="ContentQuery.cs" />
     <Compile Include="ContentQuery_NEW.cs" />
+    <Compile Include="DefaultIndexingEngineFactory.cs" />
     <Compile Include="Indexing\Activities\AddDocumentActivity.cs" />
     <Compile Include="Indexing\Activities\AddTreeActivity.cs" />
     <Compile Include="Indexing\Activities\BackupActivity.cs" />
@@ -73,7 +74,10 @@
     <Compile Include="Indexing\Activities\RemoveDocumentActivity.cs" />
     <Compile Include="Indexing\Activities\RemoveTreeActivity.cs" />
     <Compile Include="Indexing\Activities\UpdateDocumentActivity.cs" />
-    <Compile Include="Indexing\BackupTools.cs" />
+    <Compile Include="Indexing\CustomIndexFieldManager.cs" />
+    <Compile Include="Indexing\IndexDocumentProvider.cs" />
+    <Compile Include="Indexing\IndexingActivityQueue.cs" />
+    <Compile Include="Lucene29\BackupTools.cs" />
     <Compile Include="Indexing\DocumentPopulator.cs" />
     <Compile Include="Indexing\EnumConverter.cs" />
     <Compile Include="Indexing\ExplicitPerFieldIndexingInfo.cs" />
@@ -81,17 +85,18 @@
     <Compile Include="Indexing\IndexFieldInfo.cs" />
     <Compile Include="Indexing\IndexHealthMonitor.cs" />
     <Compile Include="Indexing\IndexingActivityFactory.cs" />
-    <Compile Include="Indexing\IndexingActivityQueue.cs" />
     <Compile Include="Indexing\IndexingTools.cs" />
-    <Compile Include="Indexing\IndexReaderFrame.cs" />
-    <Compile Include="Indexing\IndexWriterFrame.cs" />
-    <Compile Include="Indexing\IntegrityChecker.cs" />
-    <Compile Include="Indexing\LuceneManager.cs" />
+    <Compile Include="Lucene29\IndexReaderFrame.cs" />
+    <Compile Include="Lucene29\IndexWriterFrame.cs" />
+    <Compile Include="Lucene29\IntegrityChecker.cs" />
+    <Compile Include="Indexing\IndexManager.cs" />
     <Compile Include="Indexing\PerFieldIndexingInfo.cs" />
     <Compile Include="Indexing\SnPerFieldAnalyzerWrapper.cs" />
-    <Compile Include="IndexManager.cs" />
+    <Compile Include="Lucene29\Lucene29IndexDocument.cs" />
+    <Compile Include="Lucene29\Lucene29IndexManager.cs" />
     <Compile Include="InvalidContentQueryException.cs" />
     <Compile Include="Lucene29\Lucene29Compiler.cs" />
+    <Compile Include="Lucene29\Lucene29IndexingEngine.cs" />
     <Compile Include="Lucene29\Lucene29QueryEngine.cs" />
     <Compile Include="Lucene29\SnQueryToLucQueryVisitor.cs" />
     <Compile Include="LuceneSearchEngine.cs" />

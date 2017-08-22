@@ -10,6 +10,9 @@ namespace SenseNet.Search
 {
     public class LuceneSearchEngine : ISearchEngine
     {
+        public static readonly Lucene.Net.Util.Version LuceneVersion = Lucene.Net.Util.Version.LUCENE_29;
+
+
         static LuceneSearchEngine()
         {
             Lucene.Net.Search.BooleanQuery.SetMaxClauseCount(100000);
@@ -17,19 +20,19 @@ namespace SenseNet.Search
 
         public bool IndexingPaused
         {
-            get { return LuceneManager.Paused; }}
+            get { return IndexManager.Paused; }}
 
         public void PauseIndexing()
         {
-            LuceneManager.PauseIndexing();
+            IndexManager.PauseIndexing();
         }
         public void ContinueIndexing()
         {
-            LuceneManager.ContinueIndexing();
+            IndexManager.ContinueIndexing();
         }
         public void WaitIfIndexingPaused()
         {
-            LuceneManager.WaitIfIndexingPaused();
+            IndexManager.WaitIfIndexingPaused();
         }
 
 
@@ -76,19 +79,6 @@ namespace SenseNet.Search
                 }
                 _analyzers = analyzerTypes;
             }
-        }
-
-        public object DeserializeIndexDocumentInfo(byte[] indexDocumentInfoBytes)
-        {
-            if (indexDocumentInfoBytes == null)
-                return null;
-            if (indexDocumentInfoBytes.Length == 0)
-                return null;
-
-            var docStream = new System.IO.MemoryStream(indexDocumentInfoBytes);
-            var formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
-            var info = (IndexDocumentInfo)formatter.Deserialize(docStream);
-            return info;
         }
     }
 }
