@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,7 +11,7 @@ using IndexBatch = Microsoft.Azure.Search.Models.IndexBatch;
 
 namespace SenseNet.Search.Azure.Indexing
 {
-    public class AzureIndexer
+    public class AzureIndexingEngine: IIndexingEngine
     {
         private static string _apiKey = "";
         private static string _schema = "https://";
@@ -27,7 +28,7 @@ namespace SenseNet.Search.Azure.Indexing
         private static IDocumentsOperations _documents;
         //private Dictionary<string, List<string>> _customHeaders = null;
 
-        public AzureIndexer()
+        public AzureIndexingEngine()
         {
             if (_credentials == null)
             {
@@ -74,7 +75,7 @@ namespace SenseNet.Search.Azure.Indexing
                 {
                     throw;
                 }
-                var failedBatch = batchException.FindFailedActionsToRetry(batch,  r => r.GetKey(r));
+                var failedBatch = batchException.FindFailedActionsToRetry(batch,  r => r.GetStringValue(IndexFieldName.Name));
                 Thread.Sleep(RetryWaitTime(tryCount));
                 return Index(failedBatch, ++tryCount);
             }
@@ -97,7 +98,74 @@ namespace SenseNet.Search.Azure.Indexing
 
         public AzureDocumentIndexResult Delete(IEnumerable<string> keys)
         {
-            return Index(IndexBatch.Delete(keys.Select( k => new IndexDocument {Id = k})), 1);
+            return Index(IndexBatch.Delete(), 1);
+            return Index(IndexBatch.Delete(IndexFieldName.Name, keys), 1);
         }
+
+        #region IIndexingEngine
+
+        public bool Running { get; }
+        public bool Paused { get; }
+        public void Pause()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Continue()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Start(TextWriter consoleOut)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void WaitIfIndexingPaused()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void ShutDown()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Restart()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void ActivityFinished()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Commit(int lastActivityId = 0)
+        {
+            throw new NotImplementedException();
+        }
+
+        public IIndexingActivityStatus ReadActivityStatusFromIndex()
+        {
+            throw new NotImplementedException();
+        }
+
+        public IEnumerable<IIndexDocument> GetDocumentsByNodeId(int nodeId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Actualize(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Actualize(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> addition)
+        {
+            throw new NotImplementedException();
+        }
+
+        #endregion
     }
 }
