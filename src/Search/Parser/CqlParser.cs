@@ -326,7 +326,7 @@ namespace SenseNet.Search.Parser
             if (result != null)
                 return result;
 
-            throw ParserError(String.Concat("Unexpected '", _lexer.StringValue, "'"));
+            throw ParserError($"Unexpected '{_lexer.StringValue}'");
         }
         private SnQueryPredicate ParseBinaryTermExp()
         {
@@ -376,7 +376,7 @@ namespace SenseNet.Search.Parser
             var result = ParseValueExpList();
 
             if (_lexer.CurrentToken != CqlLexer.Token.RParen)
-                throw ParserError("Expcted: ')'");
+                throw ParserError("Expected: ')'");
             _lexer.NextToken();
 
             return result;
