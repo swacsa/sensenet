@@ -88,6 +88,191 @@ namespace SenseNet.Search.Tests
             TestError("Index:[2 TO 3", "Unterminated Range expression");
             TestError("Index:{2 TO 3", "Unterminated Range expression");
         }
+
+        [TestMethod]
+        public void Search_Parser_AstToString_MultiBool()
+        {
+            BoolTest("a (b c)");
+            BoolTest("a (b +c)");
+            BoolTest("a (b -c)");
+            BoolTest("a (+b c)");
+            BoolTest("a (+b +c)");
+            BoolTest("a (+b -c)");
+            BoolTest("a (-b c)");
+            BoolTest("a (-b +c)");
+            BoolTest("a (-b -c)");
+
+            BoolTest("a +(b c)");
+            BoolTest("a +(b +c)");
+            BoolTest("a +(b -c)");
+            BoolTest("a +(+b c)");
+            BoolTest("a +(+b +c)");
+            BoolTest("a +(+b -c)");
+            BoolTest("a +(-b c)");
+            BoolTest("a +(-b +c)");
+            BoolTest("a +(-b -c)");
+
+            BoolTest("a -(b c)");
+            BoolTest("a -(b +c)");
+            BoolTest("a -(b -c)");
+            BoolTest("a -(+b c)");
+            BoolTest("a -(+b +c)");
+            BoolTest("a -(+b -c)");
+            BoolTest("a -(-b c)");
+            BoolTest("a -(-b +c)");
+            BoolTest("a -(-b -c)");
+
+            BoolTest("+a (b c)");
+            BoolTest("+a (b +c)");
+            BoolTest("+a (b -c)");
+            BoolTest("+a (+b c)");
+            BoolTest("+a (+b +c)");
+            BoolTest("+a (+b -c)");
+            BoolTest("+a (-b c)");
+            BoolTest("+a (-b +c)");
+            BoolTest("+a (-b -c)");
+
+            BoolTest("+a +(b c)");
+            BoolTest("+a +(b +c)");
+            BoolTest("+a +(b -c)");
+            BoolTest("+a +(+b c)");
+            BoolTest("+a +(+b +c)");
+            BoolTest("+a +(+b -c)");
+            BoolTest("+a +(-b c)");
+            BoolTest("+a +(-b +c)");
+            BoolTest("+a +(-b -c)");
+
+            BoolTest("+a -(b c)");
+            BoolTest("+a -(b +c)");
+            BoolTest("+a -(b -c)");
+            BoolTest("+a -(+b c)");
+            BoolTest("+a -(+b +c)");
+            BoolTest("+a -(+b -c)");
+            BoolTest("+a -(-b c)");
+            BoolTest("+a -(-b +c)");
+            BoolTest("+a -(-b -c)");
+
+            BoolTest("-a (b c)");
+            BoolTest("-a (b +c)");
+            BoolTest("-a (b -c)");
+            BoolTest("-a (+b c)");
+            BoolTest("-a (+b +c)");
+            BoolTest("-a (+b -c)");
+            BoolTest("-a (-b c)");
+            BoolTest("-a (-b +c)");
+            BoolTest("-a (-b -c)");
+
+            BoolTest("-a +(b c)");
+            BoolTest("-a +(b +c)");
+            BoolTest("-a +(b -c)");
+            BoolTest("-a +(+b c)");
+            BoolTest("-a +(+b +c)");
+            BoolTest("-a +(+b -c)");
+            BoolTest("-a +(-b c)");
+            BoolTest("-a +(-b +c)");
+            BoolTest("-a +(-b -c)");
+
+            BoolTest("-a -(b c)");
+            BoolTest("-a -(b +c)");
+            BoolTest("-a -(b -c)");
+            BoolTest("-a -(+b c)");
+            BoolTest("-a -(+b +c)");
+            BoolTest("-a -(+b -c)");
+            BoolTest("-a -(-b c)");
+            BoolTest("-a -(-b +c)");
+            BoolTest("-a -(-b -c)");
+
+        }
+        [TestMethod]
+        public void Search_Parser_AstToString_MultiBool_AndOr()
+        {
+            BoolTest("a OR (b OR c)"                  , "a (b c)");
+            BoolTest("a OR (b +c)"                    , "a (b +c)"   );
+            BoolTest("a OR (b -c)"                    , "a (b -c)"   );
+            BoolTest("a OR (+b c)"                    , "a (+b c)"   );
+            BoolTest("a OR (b AND c)"                 , "a (+b +c)"  );
+            BoolTest("a OR (+b -c)"                   , "a (+b -c)"  );
+            BoolTest("a OR (-b c)"                    , "a (-b c)"   );
+            BoolTest("a OR (-b +c)"                   , "a (-b +c)"  );
+            BoolTest("a OR (NOT b OR NOT c)"          , "a (-b -c)"  );
+
+            BoolTest("a +(b OR c)"                    , "a +(b c)"   );
+            BoolTest("a +(b AND c)"                   , "a +(+b +c)" );
+            BoolTest("a +(NOT b OR NOT c)"            , "a +(-b -c)" );
+
+            BoolTest("a -(b OR c)"                    , "a -(b c)"   );
+            BoolTest("a -(b AND c)"                   , "a -(+b +c)" );
+            BoolTest("a -(NOT b OR NOT c)"            , "a -(-b -c)" );
+
+            BoolTest("+a (b OR c)"                    , "+a (b c)"   );
+            BoolTest("+a (b AND c)"                   , "+a (+b +c)" );
+            BoolTest("+a (NOT b OR NOT c)"            , "+a (-b -c)" );
+
+            BoolTest("a AND (b OR c)"                 , "+a +(b c)"  );
+            BoolTest("a AND (b +c)"                   , "+a +(b +c)" );
+            BoolTest("a AND (b -c)"                   , "+a +(b -c)" );
+            BoolTest("a AND (+b c)"                   , "+a +(+b c)" );
+            BoolTest("a AND (b AND c)"                , "+a +(+b +c)");
+            BoolTest("a AND (+b -c)"                  , "+a +(+b -c)");
+            BoolTest("a AND (-b c)"                   , "+a +(-b c)" );
+            BoolTest("a AND (-b +c)"                  , "+a +(-b +c)");
+            BoolTest("a AND (NOT b OR NOT c)"         , "+a +(-b -c)");
+
+            BoolTest("+a -(b OR c)"                   , "+a -(b c)"  );
+            BoolTest("+a -(b AND c)"                  , "+a -(+b +c)");
+            BoolTest("+a -(NOT b OR NOT c)"           , "+a -(-b -c)");
+
+            BoolTest("-a (b OR c)"                    , "-a (b c)"   );
+            BoolTest("-a (b AND c)"                   , "-a (+b +c)" );
+            BoolTest("-a (NOT b OR NOT c)"            , "-a (-b -c)" );
+
+            BoolTest("-a +(b OR c)"                   , "-a +(b c)"  );
+            BoolTest("-a +(b AND c)"                  , "-a +(+b +c)");
+            BoolTest("-a +(NOT b OR NOT c)"           , "-a +(-b -c)");
+
+            BoolTest("NOT a AND NOT (b OR c)"         , "-a -(b c)"  );
+            BoolTest("NOT a AND NOT (b +c)"           , "-a -(b +c)" );
+            BoolTest("NOT a AND NOT (b -c)"           , "-a -(b -c)" );
+            BoolTest("NOT a AND NOT (+b c)"           , "-a -(+b c)" );
+            BoolTest("NOT a AND NOT (b AND c)"        , "-a -(+b +c)");
+            BoolTest("NOT a AND NOT (+b -c)"          , "-a -(+b -c)");
+            BoolTest("NOT a AND NOT (-b c)"           , "-a -(-b c)" );
+            BoolTest("NOT a AND NOT (-b +c)"          , "-a -(-b +c)");
+            BoolTest("NOT a AND NOT (NOT b OR NOT c)" , "-a -(-b -c)");
+        }
+        [TestMethod]
+        public void Search_Parser_AstToString_MultiBool_AndOrNot()
+        {
+            BoolTest("a AND NOT b", "+a -b");
+            BoolTest("a OR NOT b", "a -b");
+            BoolTest("NOT a AND NOT b", "-a -b");
+            BoolTest("NOT a OR NOT b", "-a -b");
+        }
+
+        [TestMethod]
+        public void Search_Parser_AstToString_MultiBool_Mix()
+        {
+            BoolTest("a AND b",   "+a +b");
+            BoolTest("a AND +b",  "+a +b");
+            BoolTest("a AND -b",  "+a -b");
+            BoolTest("+a AND b",  "+a +b");
+            BoolTest("+a AND +b", "+a +b");
+            BoolTest("+a AND -b", "+a -b");
+            BoolTest("-a AND b",  "-a +b");
+            BoolTest("-a AND +b", "-a +b");
+            BoolTest("-a AND -b", "-a -b");
+
+            BoolTest("a OR b",   "a b");
+            BoolTest("a OR +b",  "a +b");
+            BoolTest("a OR -b",  "a -b");
+            BoolTest("+a OR b",  "+a b");
+            BoolTest("+a OR +b", "+a +b");
+            BoolTest("+a OR -b", "+a -b");
+            BoolTest("-a OR b",  "-a b");
+            BoolTest("-a OR +b", "-a +b");
+            BoolTest("-a OR -b", "-a -b");
+        }
+
         [TestMethod]
         public void Search_Parser_AstToString_EmptyQueries()
         {
@@ -279,6 +464,22 @@ namespace SenseNet.Search.Tests
             //UNDONE: Nullref exception in this test: Test("Name:()");
         }
 
+        /* ============================================================================= */
+        private SnQuery BoolTest(string queryText, string expected = null)
+        {
+            return Test(TransformToTerms(queryText), TransformToTerms(expected));
+        }
+        private string TransformToTerms(string text)
+        {
+            if (text == null)
+                return null;
+
+            for (var c = 'a'; c < 'e'; c++)
+                text = text.Replace(c.ToString(), $"F{c}:{c}");
+
+            return text;
+        }
+
         private SnQuery Test(string queryText, string expected = null)
         {
             var queryContext = new TestQueryContext(QuerySettings.Default, 0, null);
@@ -293,6 +494,7 @@ namespace SenseNet.Search.Tests
             Assert.AreEqual(expected ?? queryText, actualResult);
             return snQuery;
         }
+
         private void TestError(string queryText, string expectedMessageSubstring)
         {
             var queryContext = new TestQueryContext(QuerySettings.Default, 0, null);
