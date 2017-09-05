@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Azure.Search;
 using Microsoft.Azure.Search.Models;
 using SenseNet.Search.Azure.Indexing.Models;
+using SenseNet.Search.Indexing;
 using IndexBatch = Microsoft.Azure.Search.Models.IndexBatch;
 
 namespace SenseNet.Search.Azure.Indexing
@@ -28,6 +29,8 @@ namespace SenseNet.Search.Azure.Indexing
         private static IDocumentsOperations _documents;
         //private Dictionary<string, List<string>> _customHeaders = null;
 
+        private static IActivityQueueConnector _queueConnector;
+
         public AzureIndexingEngine()
         {
             if (_credentials == null)
@@ -39,7 +42,7 @@ namespace SenseNet.Search.Azure.Indexing
                 _documents = _indexClient.Documents;
             }
         }
-
+        #region Azure calls
         private readonly int[] _transientErrorCodes = {207, 422, 503};
 
         public Task<AzureDocumentIndexResult> UploadAsync<T>(IEnumerable<T> documents) where T : IndexDocument
@@ -86,7 +89,7 @@ namespace SenseNet.Search.Azure.Indexing
             return (int) Math.Pow(2, tryCount);
         }
 
-        public Task<AzureDocumentIndexResult> DeleteAsync(IEnumerable<string> keys)
+        public Task<AzureDocumentIndexResult> DeleteAsync<T>(IEnumerable<T> keys) where T : IndexDocument
         {
             var cancellationToken = new CancellationToken();
             if (keys == null)
@@ -96,59 +99,58 @@ namespace SenseNet.Search.Azure.Indexing
             return Task.Factory.StartNew(() => Delete(keys), cancellationToken);
         }
 
-        public AzureDocumentIndexResult Delete(IEnumerable<string> keys)
+        public AzureDocumentIndexResult Delete<T>(IEnumerable<T> keys) where T : IndexDocument
         {
-            return Index(IndexBatch.Delete(), 1);
-            return Index(IndexBatch.Delete(IndexFieldName.Name, keys), 1);
+            //return Index( IndexBatch.Delete((IndexFieldName.Name, keys), 1);
+            return Index(IndexBatch.Delete(keys), 1);
         }
+
+        #endregion
 
         #region IIndexingEngine
 
-        public bool Running { get; }
-        public bool Paused { get; }
+        public bool Running { get; private set; }
+        public bool Paused { get; private set; }
         public void Pause()
         {
-            throw new NotImplementedException();
+            Paused = true;
         }
 
         public void Continue()
         {
-            throw new NotImplementedException();
+            Paused = false;
         }
 
         public void Start(TextWriter consoleOut)
         {
-            throw new NotImplementedException();
+            
         }
 
         public void WaitIfIndexingPaused()
         {
-            throw new NotImplementedException();
+            
         }
 
         public void ShutDown()
         {
-            throw new NotImplementedException();
+            
         }
 
         public void Restart()
         {
-            throw new NotImplementedException();
         }
 
         public void ActivityFinished()
         {
-            throw new NotImplementedException();
         }
 
         public void Commit(int lastActivityId = 0)
         {
-            throw new NotImplementedException();
         }
 
         public IIndexingActivityStatus ReadActivityStatusFromIndex()
         {
-            throw new NotImplementedException();
+            return CompletionState.ParseFromReader(_queueConnector.GetCompletionInfo());
         }
 
         public IEnumerable<IIndexDocument> GetDocumentsByNodeId(int nodeId)

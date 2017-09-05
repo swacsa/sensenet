@@ -61,7 +61,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Indexing\AzureIndexer.cs" />
+    <Compile Include="Indexing\ActivityQueueConnector.cs" />
+    <Compile Include="Indexing\AzureIndexingEngine.cs" />
+    <Compile Include="Indexing\IActivityQueueConnector.cs" />
     <Compile Include="Indexing\Models\AzureDocumentIndexResult.cs" />
     <Compile Include="Indexing\Models\AzureIndexingResult.cs" />
     <Compile Include="Indexing\Models\IndexDocument.cs" />
