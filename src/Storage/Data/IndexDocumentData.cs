@@ -18,31 +18,31 @@ namespace SenseNet.ContentRepository.Storage.Data
             get
             {
                 if (_indexDocument == null)
-                    _indexDocument = IndexDocument.Deserialize(_indexDocumentBytes);
+                    _indexDocument = IndexDocument.Deserialize(_serializedIndexDocument);
                 return _indexDocument;
             }
         }
 
-        private byte[] _indexDocumentBytes;
-        public byte[] IndexDocumentInfoBytes //UNDONE:!!!!!!!!! Rename to SerializedIndexDocument
+        private byte[] _serializedIndexDocument;
+        public byte[] SerializedIndexDocument
         {
             get
             {
-                if (_indexDocumentBytes == null)
+                if (_serializedIndexDocument == null)
                 {
                     using (var docStream = new MemoryStream())
                     {
                         var formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
                         formatter.Serialize(docStream, _indexDocument);
                         docStream.Flush();
-                        IndexDocumentInfoSize = docStream.Length;
-                        _indexDocumentBytes = docStream.GetBuffer();
+                        IndexDocumentSize = docStream.Length;
+                        _serializedIndexDocument = docStream.GetBuffer();
                     }
                 }
-                return _indexDocumentBytes;
+                return _serializedIndexDocument;
             }
         }
-        public long? IndexDocumentInfoSize { get; set; }
+        public long? IndexDocumentSize { get; set; }
 
         public int NodeTypeId { get; set; }
         public int VersionId { get; set; }
@@ -58,12 +58,12 @@ namespace SenseNet.ContentRepository.Storage.Data
         public IndexDocumentData(IndexDocument indexDocument, byte[] indexDocumentBytes)
         {
             _indexDocument = indexDocument;
-            _indexDocumentBytes = indexDocumentBytes;
+            _serializedIndexDocument = indexDocumentBytes;
         }
 
         public void IndexDocumentChanged()
         {
-            _indexDocumentBytes = null;
+            _serializedIndexDocument = null;
         }
     }
 }

@@ -31,19 +31,22 @@ namespace SenseNet.Search.Indexing
 
         /*======================================================================================================= IIndexPopulator Members */
 
-        // caller: IndexPopulator.Populator, Import.Importer, Tests.Initializer, RunOnce
-        public void ClearAndPopulateAll(bool backup = true, TextWriter consoleWriter = null)
+        // caller: IndexPopulator.Populator, Import.Importer, Tests
+        public void ClearAndPopulateAll(TextWriter consoleWriter = null)
         {
             var lastActivityId = IndexManager.GetLastStoredIndexingActivityId();
-
             using (var op = SnTrace.Index.StartOperation("IndexPopulator ClearAndPopulateAll"))
             {
                 // recreate
-                IndexManager.IndexingEngine.Actualize(null,
+                consoleWriter?.Write("  Cleanup index ... ");
+                IndexManager.ClearIndex();
+                consoleWriter?.WriteLine("ok");
+
+                IndexManager.AddDocuments(
                     StorageContext.Search.LoadIndexDocumentsByPath("/Root", IndexManager.GetNotIndexedNodeTypes())
                         .Select(d =>
                         {
-                            var indexDoc = IndexManager.CreateIndexDocument(d.IndexDocument, d); //UNDONE: refactor IndexDocumentData --> complete IndexDocument
+                            var indexDoc = IndexManager.CompleteIndexDocument(d);
                             OnNodeIndexed(d.Path);
                             return indexDoc;
                         }));
@@ -65,7 +68,7 @@ namespace SenseNet.Search.Indexing
             {
                 IndexManager.IndexingEngine.Actualize(new[] {new SnTerm(IndexFieldName.InTree, path)},
                     StorageContext.Search.LoadIndexDocumentsByPath(path, IndexManager.GetNotIndexedNodeTypes())
-                        .Select(d => IndexManager.CreateIndexDocument(d.IndexDocument, d))); //UNDONE: refactor IndexDocumentData --> complete IndexDocument
+                        .Select(IndexManager.CompleteIndexDocument));
                 op.Successful = true;
             }
         }
@@ -261,9 +264,9 @@ namespace SenseNet.Search.Indexing
         }
         /*================================================================================================================================*/
 
-        private static LuceneIndexingActivity CreateActivity(IndexingActivityType type, string path, int nodeId, int versionId, long versionTimestamp, bool? singleVersion, VersioningInfo versioningInfo, IndexDocumentData indexDocumentData)
+        private static IndexingActivityBase CreateActivity(IndexingActivityType type, string path, int nodeId, int versionId, long versionTimestamp, bool? singleVersion, VersioningInfo versioningInfo, IndexDocumentData indexDocumentData)
         {
-            var activity = (LuceneIndexingActivity)IndexingActivityFactory.Instance.CreateActivity(type);
+            var activity = (IndexingActivityBase)IndexingActivityFactory.Instance.CreateActivity(type);
             activity.Path = path.ToLowerInvariant();
             activity.NodeId = nodeId;
             activity.VersionId = versionId;
@@ -272,27 +275,27 @@ namespace SenseNet.Search.Indexing
 
             if (indexDocumentData != null)
             {
-                var lucDocAct = activity as LuceneDocumentActivity;
+                var lucDocAct = activity as DocumentIndexingActivity;
                 if (lucDocAct != null)
                     lucDocAct.IndexDocumentData = indexDocumentData;
             }
 
-            var documentActivity = activity as LuceneDocumentActivity;
+            var documentActivity = activity as DocumentIndexingActivity;
             if (documentActivity != null)
                 documentActivity.Versioning = versioningInfo;
 
             return activity;
         }
-        private static LuceneIndexingActivity CreateTreeActivity(IndexingActivityType type, string path, int nodeId, bool moveOrRename, IndexDocumentData indexDocumentData)
+        private static IndexingActivityBase CreateTreeActivity(IndexingActivityType type, string path, int nodeId, bool moveOrRename, IndexDocumentData indexDocumentData)
         {
-            var activity = (LuceneIndexingActivity)IndexingActivityFactory.Instance.CreateActivity(type);
+            var activity = (IndexingActivityBase)IndexingActivityFactory.Instance.CreateActivity(type);
             activity.Path = path.ToLowerInvariant();
             activity.NodeId = nodeId;
             activity.MoveOrRename = moveOrRename;
 
             if (indexDocumentData != null)
             {
-                var lucDocAct = activity as LuceneDocumentActivity;
+                var lucDocAct = activity as DocumentIndexingActivity;
                 if (lucDocAct != null)
                     lucDocAct.IndexDocumentData = indexDocumentData;
             }
@@ -307,7 +310,7 @@ namespace SenseNet.Search.Indexing
         {
             ExecuteActivity(CreateTreeActivity(type, path, nodeId, moveOrRename, indexDocumentData));
         }
-        private static void ExecuteActivity(LuceneIndexingActivity activity)
+        private static void ExecuteActivity(IndexingActivityBase activity)
         {
             IndexManager.RegisterActivity(activity);
             IndexManager.ExecuteActivity(activity, true, true);

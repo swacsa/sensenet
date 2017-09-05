@@ -53,14 +53,6 @@ namespace SenseNet.ContentRepository
             /// </summary>
             public string[] Plugins { get; internal set; }
             /// <summary>
-            /// Absolute path of the index directory.
-            /// </summary>
-            public string IndexDirectory { get; internal set; } //UNDONE:! Provider specific info
-            /// <summary>
-            /// True if the index was read only before startup. Means: there was writer.lock file in the configured index directory.
-            /// </summary>
-            public bool IndexWasReadOnly { get; internal set; } //UNDONE:! Provider specific info
-            /// <summary>
             /// Moment of the start before executing the startup sequence.
             /// </summary>
             public DateTime Starting { get; internal set; }
@@ -138,20 +130,12 @@ namespace SenseNet.ContentRepository
 
             InitializeLogger();
 
-            //UNDONE:!!! Move to SnSearch
-            // Lucene subsystem behaves strangely if the enums are not initialized.
-            var x = Lucene.Net.Documents.Field.Index.NO;
-            var y = Lucene.Net.Documents.Field.Store.NO;
-            var z = Lucene.Net.Documents.Field.TermVector.NO;
-
             CounterManager.Start();
 
             RegisterAppdomainEventHandlers();
 
             if (_settings.IndexPath != null)
                 StorageContext.Search.SetIndexDirectoryPath(_settings.IndexPath);
-            RemoveIndexWriterLockFile(); //UNDONE:!!! Move to SnSearch
-            _startupInfo.IndexDirectory = Path.GetDirectoryName(StorageContext.Search.IndexLockFilePath); //UNDONE:!!! Provider specific info
 
             LoadAssemblies();
 
@@ -187,6 +171,8 @@ namespace SenseNet.ContentRepository
         /// <summary>
         /// Starts workflow engine if it is not running.
         /// </summary>
+
+        private bool _workflowEngineIsRunning;
         public void StartWorkflowEngine()
         {
             if (_workflowEngineIsRunning)
@@ -331,39 +317,6 @@ namespace SenseNet.ContentRepository
                 SnLog.Instance = new DebugWriteLoggerAdapter();
         }
 
-        private void RemoveIndexWriterLockFile() //UNDONE:!!! Move to SnSearch
-        {
-            // delete write.lock if necessary
-            var lockFilePath = StorageContext.Search.IndexLockFilePath;
-            if (lockFilePath == null)
-                return;
-            if (System.IO.File.Exists(lockFilePath))
-            {
-                _startupInfo.IndexWasReadOnly = true;
-                var endRetry = DateTime.UtcNow.AddSeconds(Indexing.LuceneLockDeleteRetryInterval);
-
-                // retry write.lock for a given period of time
-                while (true)
-                {
-                    try
-                    {
-                        System.IO.File.Delete(lockFilePath);
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        Thread.Sleep(5000);
-                        if (DateTime.UtcNow > endRetry)
-                            throw new IOException("Cannot remove the index lock: " + ex.Message, ex);
-                    }
-                }
-            }
-            else
-            {
-                _startupInfo.IndexWasReadOnly = false;
-                ConsoleWriteLine("Index directory is read/write.");
-            }
-        }
         private void RegisterAppdomainEventHandlers()
         {
             AppDomain appDomain = AppDomain.CurrentDomain;
@@ -437,33 +390,14 @@ namespace SenseNet.ContentRepository
                 SnTrace.Repository.Write("Shutting down {0}", DistributedApplication.ClusterChannel.GetType().Name);
                 DistributedApplication.ClusterChannel.ShutDown();
 
-                if (Instance.StartSettings.BackupIndexAtTheEnd)
-                {
-                    SnTrace.Repository.Write("Backing up the index.");
-                    if (LuceneManagerIsRunning)
-                    {
-                        _instance.ConsoleWriteLine("Backing up the index...");
-                        BackupTools.SynchronousBackupIndex();
-                        _instance.ConsoleWriteLine("The backup of index is finished.");
-                    }
-                    else
-                    {
-                        _instance.ConsoleWriteLine("Backing up index is skipped because Lucene was not started.");
-                    }
-                }
-
                 if (LuceneManagerIsRunning)
                 {
                     SnTrace.Repository.Write("Shutting down LuceneManager.");
                     IndexManager.ShutDown();
                 }
 
-                SnTrace.Repository.Write("Waiting for writer lock file is released.");
-                WaitForWriterLockFileIsReleased(RepositoryInstance.WaitForLockFileType.OnEnd);
-
                 var t = DateTime.UtcNow - _instance._startupInfo.Starting;
-                var msg = String.Format("Repository has stopped. Running time: {0}.{1:d2}:{2:d2}:{3:d2}", t.Days,
-                                        t.Hours, t.Minutes, t.Seconds);
+                var msg = $"Repository has stopped. Running time: {t.Days}.{t.Hours:d2}:{t.Minutes:d2}:{t.Seconds:d2}";
 
                 SnTrace.Repository.Write(msg);
                 SnTrace.Flush();
@@ -495,70 +429,6 @@ namespace SenseNet.ContentRepository
             return _started;
         }
 
-        /* ======================================== Wait for write.lock */
-        private const string WRITELOCKREMOVEERRORSUBJECTSTR = "Error at application start";
-        private const string WRITELOCKREMOVEERRORTEMPLATESTR = "Write.lock was present at application start and was not removed within set timeout interval ({0} seconds) - a previous appdomain may use the index. Write.lock deletion and application start is forced. AppDomain friendlyname: {1}, base directory: {2}";
-        private const string WRITELOCKREMOVEERRORONENDTEMPLATESTR = "Write.lock was present at shutdown and was not removed within set timeout interval ({0} seconds) - application exit is forced. AppDomain friendlyname: {1}, base directory: {2}";
-        private const string WRITELOCKREMOVEEMAILERRORSTR = "Could not send notification email about write.lock removal. Check the notification section in the config file!";
-
-        public enum WaitForLockFileType { OnStart = 0, OnEnd }
-
-        /// <summary>
-        /// Waits for write.lock to disappear for a configured time interval. Timeout: configured with IndexLockFileWaitForRemovedTimeout key. 
-        /// If timeout is exceeded an error is logged and execution continues. For errors at OnStart an email is also sent to a configured address.
-        /// </summary>
-        /// <param name="waitType">A parameter that influences the logged error message and email template only.</param>
-        public static void WaitForWriterLockFileIsReleased(WaitForLockFileType waitType)
-        {
-            // check if writer.lock is still there -> if yes, wait for other appdomain to quit or lock to disappear - until a given timeout.
-            // after timeout is passed, Repository.Start will deliberately attempt to remove lock file on following startup
-
-            if (!Lucene29IndexManager.WaitForWriterLockFileIsReleased())
-            {
-                // lock file was not removed by other or current appdomain for the given time interval (onstart: other appdomain might use it, onend: current appdomain did not release it yet)
-                // onstart -> notify operator and start repository anyway
-                // onend -> log error, and continue
-                var template = waitType == WaitForLockFileType.OnEnd ? WRITELOCKREMOVEERRORONENDTEMPLATESTR : WRITELOCKREMOVEERRORTEMPLATESTR;
-                SnLog.WriteError(string.Format(template, Indexing.IndexLockFileWaitForRemovedTimeout,
-                    AppDomain.CurrentDomain.FriendlyName, AppDomain.CurrentDomain.BaseDirectory));
-
-                if (waitType == WaitForLockFileType.OnStart)
-                    SendWaitForLockErrorMail();
-            }
-        }
-        private static void SendWaitForLockErrorMail()
-        {
-            if (!String.IsNullOrEmpty(Notification.NotificationSender) && !String.IsNullOrEmpty(Indexing.IndexLockFileRemovedNotificationEmail))
-            {
-                try
-                {
-                    var smtpClient = new SmtpClient();
-                    var msgstr = String.Format(WRITELOCKREMOVEERRORTEMPLATESTR,
-                        Indexing.IndexLockFileWaitForRemovedTimeout,
-                        AppDomain.CurrentDomain.FriendlyName,
-                        AppDomain.CurrentDomain.BaseDirectory);
-                    var msg = new MailMessage(
-                        Notification.NotificationSender,
-                        Indexing.IndexLockFileRemovedNotificationEmail.Replace(';', ','),
-                        WRITELOCKREMOVEERRORSUBJECTSTR,
-                        msgstr);
-                    smtpClient.Send(msg);
-                }
-                catch (Exception ex)
-                {
-                    SnLog.WriteException(ex);
-                }
-            }
-            else
-            {
-                SnLog.WriteError(WRITELOCKREMOVEEMAILERRORSTR);
-            }
-        }
-
-        // ========================================
-
-        private bool _workflowEngineIsRunning;
-
         // ======================================== LuceneManager hooks
 
         public static bool LuceneManagerIsRunning
@@ -569,30 +439,6 @@ namespace SenseNet.ContentRepository
                     throw new NotSupportedException("Querying running state of LuceneManager is not supported when RepositoryInstance is not created.");
                 return IndexManager.Running;
             }
-        }
-        public static bool IndexingPaused
-        {
-            get
-            {
-                if (_instance == null)
-                    throw new NotSupportedException("Querying pausing state of LuceneManager is not supported when RepositoryInstance is not created.");
-                return StorageContext.Search.SearchEngine.IndexingPaused;
-            }
-        }
-
-        internal static bool RestoreIndexOnStartup()
-        {
-            if (_instance == null)
-                return true;
-            return _instance._settings.RestoreIndex;
-        }
-
-        // ======================================== Outer search engine
-
-        [Obsolete("Use StorageContext.Search.ContentQueryIsAllowed")] //UNDONE: review magic string
-        public static bool ContentQueryIsAllowed
-        {
-            get { return StorageContext.Search.ContentQueryIsAllowed; }
         }
 
         // ======================================== IDisposable

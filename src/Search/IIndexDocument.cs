@@ -2,7 +2,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Dynamic;
+using System.IO;
 using System.Linq;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,7 +14,7 @@ namespace SenseNet.Search
     public class DocumentUpdate
     {
         public SnTerm UpdateTerm;
-        public IIndexDocument Document;
+        public IndexDocument Document;
     }
 
     [Serializable]
@@ -57,41 +59,23 @@ namespace SenseNet.Search
         public IndexField(string name, DateTime value, IndexingMode mode, IndexStoringMode store, IndexTermVector termVector) : base(name, value) { Mode = mode; Store = store; TermVector = termVector; }
     }
 
-    public interface IIndexDocument: IEnumerable<IndexField>
-    {
-        int VersionId { get; }
-        string Version { get; }
-
-        string GetStringValue(string fieldName);
-        string[] GetStringArrayValue(string fieldName);
-        bool GetBooleanValue(string fieldName);
-        int GetIntegerValue(string fieldName);
-        long GetLongValue(string fieldName);
-        float GetSingleValue(string fieldName);
-        double GetDoubleValue(string fieldName);
-        DateTime GetDateTimeValue(string fieldName);
-
-        /// <summary>
-        /// Adds or change the existing field in the document.
-        /// </summary>
-        /// <param name="field"></param>
-        void Add(IndexField field);
-
-        /// <summary>
-        /// Removes a field by name if it exists.
-        /// </summary>
-        /// <param name="fieldName"></param>
-        void Remove(string fieldName);
-    }
-
     [Serializable]
     public class NotIndexedIndexDocument : IndexDocument { }
 
     [Serializable]
-    public class IndexDocument : IIndexDocument
+    public class IndexDocument : IEnumerable<IndexField>
     {
         [NonSerialized]
         public static readonly IndexDocument NotIndexedDocument = new NotIndexedIndexDocument();
+
+        [NonSerialized]
+        public static List<string> PostponedFields = new List<string>(new string[] {
+            IndexFieldName.Name, IndexFieldName.Path, IndexFieldName.InTree, IndexFieldName.InFolder, IndexFieldName.Depth, IndexFieldName.ParentId,
+            IndexFieldName.IsSystem
+        });
+
+        [NonSerialized]
+        public static List<string> ForbiddenFields = new List<string>(new[] { "Password", "PasswordHash" });
 
         private readonly Dictionary<string, IndexField> _fields = new Dictionary<string, IndexField>();
 
@@ -208,7 +192,8 @@ namespace SenseNet.Search
         /// <param name="field"></param>
         public void Add(IndexField field)
         {
-            _fields[field.Name] = field;
+            if (!ForbiddenFields.Contains(field.Name))
+                _fields[field.Name] = field;
         }
 
         /// <summary>
@@ -242,10 +227,10 @@ namespace SenseNet.Search
 
         /* =========================================================================================== */
 
-        public static IndexDocument Deserialize(byte[] indexDocumentBytes)
+        public static IndexDocument Deserialize(byte[] serializedIndexDocument)
         {
-            var docStream = new System.IO.MemoryStream(indexDocumentBytes);
-            var formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
+            var docStream = new MemoryStream(serializedIndexDocument);
+            var formatter = new BinaryFormatter();
             var indxDoc = (IndexDocument)formatter.Deserialize(docStream);
             return indxDoc;
         }

@@ -8,34 +8,33 @@ namespace SenseNet.Search
         int LastActivityId { get; set; }
         int[] Gaps { get; set; }
     }
-    public class IndexingActivityStatus : IIndexingActivityStatus //UNDONE: Refactor with CompletionStatus
+    public class IndexingActivityStatus : IIndexingActivityStatus
     {
         public static IndexingActivityStatus Startup => new IndexingActivityStatus { Gaps = new int[0], LastActivityId = 0 };
         public int LastActivityId { get; set; }
         public int[] Gaps { get; set; }
     }
 
-    public interface IIndexingEngine // IIndexActualizator, IIndexingEngine
+    public interface IIndexingEngine //UNDONE: Split or not: IIndexActualizator, IIndexingEngine
     {
         bool Running { get; }
-        bool Paused { get; }
-        void Pause();
-        void Continue();
-        void Start(TextWriter consoleOut);
-        void WaitIfIndexingPaused();
-        void ShutDown();
-        void Restart();
 
-        void ActivityFinished();
-        void Commit(int lastActivityId = 0);
+        void Start(TextWriter consoleOut);
+
+        void ShutDown();
+
+        void ActivityFinished(); //UNDONE:!!!!! Remove if possible
+        void Commit(int lastActivityId = 0); //UNDONE:!!!!! Remove if possible
+
+        void ClearIndex();
 
         IIndexingActivityStatus ReadActivityStatusFromIndex();
 
         /// <summary>Only for tests.</summary>
-        IEnumerable<IIndexDocument> GetDocumentsByNodeId(int nodeId);
+        IEnumerable<IndexDocument> GetDocumentsByNodeId(int nodeId);
 
-        void Actualize(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates);
-        void Actualize(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> addition);
+        void Actualize(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates); //UNDONE: rename to a better choice
+        void Actualize(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> addition); //UNDONE: rename to a better choice
     }
 
     public interface IIndexingEngineFactory

@@ -67,16 +67,18 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
+    <Compile Include="DataProviderTests\TreeLockTests.cs" />
     <Compile Include="Implementations\InMemoryDataProvider.cs" />
     <Compile Include="Implementations\InMemoryDataProviderData.cs" />
     <Compile Include="Implementations\InMemoryIndexingEngine.cs" />
     <Compile Include="Implementations\InMemoryIndex.cs" />
     <Compile Include="Implementations\TestNode.cs" />
-    <Compile Include="Implementations\TestSearchEngine.cs" />
+    <Compile Include="Implementations\InMemorySearchEngine.cs" />
     <Compile Include="Implementations\TestSearchEngineSupport.cs" />
     <Compile Include="IndexingTests.cs" />
-    <Compile Include="InMemoryDataProviderTests.cs" />
-    <Compile Include="SnSarchToLucene29CompilerTests.cs" />
+    <Compile Include="DataProviderTests\InMemoryDataProviderTests.cs" />
+    <Compile Include="Lucene29Tests.cs" />
+    <Compile Include="SnSearchToLucene29CompilerTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TestBase.cs" />
     <Compile Include="Tools.cs" />

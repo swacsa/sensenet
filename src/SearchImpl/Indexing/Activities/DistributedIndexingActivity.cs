@@ -1,20 +1,13 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using SenseNet.Communication.Messaging;
 using System.Diagnostics;
-using System.Configuration;
-using System.IO;
 using System.Threading;
 using SenseNet.Diagnostics;
-using SenseNet.ContentRepository;
-using SenseNet.Search.Lucene29;
 
 namespace SenseNet.Search.Indexing.Activities
 {
     [Serializable]
-    public abstract class DistributedLuceneActivity : DistributedAction
+    public abstract class DistributedIndexingActivity : DistributedAction
     {
         public override void DoAction(bool onRemote, bool isFromMe)
         {
@@ -24,7 +17,7 @@ namespace SenseNet.Search.Indexing.Activities
             if (onRemote && !isFromMe)
             {
                 //TODO: Remove unnecessary inheritance steps.
-                var luceneIndexingActivity = this as LuceneIndexingActivity;
+                var luceneIndexingActivity = this as IndexingActivityBase;
                 if (luceneIndexingActivity != null)
                 {
                     // We can drop activities here because the queue will load these from the database
@@ -48,7 +41,7 @@ namespace SenseNet.Search.Indexing.Activities
 
         public override void Distribute()
         {
-            //UNDONE:!!!! Decision: skip distribution
+            //UNDONE:!! Decision: skip distribution
             base.Distribute();
         }
 
@@ -65,11 +58,11 @@ namespace SenseNet.Search.Indexing.Activities
         {
             try
             {
-                var persistentActivity = this as SenseNet.Search.Indexing.Activities.LuceneIndexingActivity;
+                var persistentActivity = this as IndexingActivityBase;
                 var id = persistentActivity == null ? "" : ", ActivityId: " + persistentActivity.Id;
                 using (var op = SnTrace.Index.StartOperation("IndexingActivity execution: type:{0} id:{1}", this.GetType().Name, id))
                 {
-                    using (new SenseNet.ContentRepository.Storage.Security.SystemAccount())
+                    using (new ContentRepository.Storage.Security.SystemAccount())
                         ExecuteIndexingActivity();
 
                     op.Successful = true;
@@ -94,7 +87,7 @@ namespace SenseNet.Search.Indexing.Activities
 
             _waitingThreadId = Thread.CurrentThread.ManagedThreadId;
 
-            var indexingActivity = this as LuceneIndexingActivity;
+            var indexingActivity = this as IndexingActivityBase;
 
             SnTrace.IndexQueue.Write("IAQ: A{0} blocks the T{1}", indexingActivity.Id, _waitingThreadId);
 

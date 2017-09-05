@@ -24,8 +24,6 @@ namespace SenseNet.Packaging.Steps
 
         public string PluginsPath { get; set; }
         public string IndexPath { get; set; }
-        public bool RestoreIndex { get; set; }
-        public bool BackupIndexAtTheEnd { get; set; }
         public bool StartWorkflowEngine { get; set; }
 
         public override void Execute(ExecutionContext context)
@@ -56,8 +54,6 @@ namespace SenseNet.Packaging.Steps
                 StartLuceneManager = startLuceneManager,
                 PluginsPath = PluginsPath ?? context.SandboxPath,
                 IndexPath = indexPath,
-                RestoreIndex = RestoreIndex,
-                BackupIndexAtTheEnd = BackupIndexAtTheEnd,
                 StartWorkflowEngine = StartWorkflowEngine
             });
 
@@ -69,8 +65,6 @@ namespace SenseNet.Packaging.Steps
             context.Console.WriteLine("  References: {0}.", trace.ReferencedAssemblies.Length);
             context.Console.WriteLine("  Loaded before start: {0}.", trace.AssembliesBeforeStart.Length);
             context.Console.WriteLine("  Plugins: {0}.", trace.Plugins.Length);
-            context.Console.WriteLine("Index: {0}.", trace.IndexDirectory);
-            context.Console.WriteLine("Index was read only: {0}", trace.IndexWasReadOnly.ToString().ToLower());
 
             context.RepositoryStarted = true;
         }

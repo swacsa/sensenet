@@ -11,26 +11,6 @@ namespace SenseNet.Search.Indexing
 {
     public class IndexDocumentProvider : IIndexDocumentProvider
     {
-        //public object GetIndexDocumentInfo(Node node, bool skipBinaries, bool isNew, out bool hasBinary)
-        //{
-        //    var x = IndexDocumentInfo.Create(node, skipBinaries, isNew);
-        //    hasBinary = x.HasBinaryField;
-        //    return x;
-        //}
-        //public object CompleteIndexDocumentInfo(Node node, object baseDocumentInfo)
-        //{
-        //    return ((IndexDocumentInfo)baseDocumentInfo).Complete(node);
-        //}
-
-        /* ======================================================================================================== */
-
-        [NonSerialized]
-        private static List<string> PostponedFields = new List<string>(new string[] {
-            IndexFieldName.Name, IndexFieldName.Path, IndexFieldName.InTree, IndexFieldName.InFolder, IndexFieldName.Depth, IndexFieldName.ParentId,
-            IndexFieldName.IsSystem
-        });
-        [NonSerialized]
-        private static List<string> ForbiddenFields = new List<string>(new string[] { "Password", "PasswordHash" });
         private static List<string> SkippedMultistepFields = new List<string>(new[] { "Size" });
 
         public IndexDocument GetIndexDocument(Node node, bool skipBinaries, bool isNew, out bool hasBinary)
@@ -44,10 +24,8 @@ namespace SenseNet.Search.Indexing
                 return IndexDocument.NotIndexedDocument;
 
             var textEtract = new StringBuilder();
-            var doc = new IndexDocument();
 
-            doc.HasCustomField = node is IHasCustomIndexField; //UNDONE:!!! Unit test IHasCustomIndexField feature
-
+            var doc = new IndexDocument {HasCustomField = node is IHasCustomIndexField}; //UNDONE: Unit test IHasCustomIndexField feature
             var ixnode = node as IIndexableDocument;
             var faultedFieldNames = new List<string>();
 
@@ -64,9 +42,9 @@ namespace SenseNet.Search.Indexing
             {
                 foreach (var field in ixnode.GetIndexableFields())
                 {
-                    if (ForbiddenFields.Contains(field.Name))
+                    if (IndexDocument.ForbiddenFields.Contains(field.Name))
                         continue;
-                    if (PostponedFields.Contains(field.Name))
+                    if (IndexDocument.PostponedFields.Contains(field.Name))
                         continue;
                     if (node.SavingState != ContentSavingState.Finalized && (field.IsBinaryField || SkippedMultistepFields.Contains(field.Name)))
                         continue;
@@ -151,9 +129,9 @@ namespace SenseNet.Search.Indexing
             {
                 foreach (var field in ixnode.GetIndexableFields())
                 {
-                    if (ForbiddenFields.Contains(field.Name))
+                    if (IndexDocument.ForbiddenFields.Contains(field.Name))
                         continue;
-                    if (PostponedFields.Contains(field.Name))
+                    if (IndexDocument.PostponedFields.Contains(field.Name))
                         continue;
                     if (node.SavingState != ContentSavingState.Finalized && (field.IsBinaryField || SkippedMultistepFields.Contains(field.Name)))
                         continue;

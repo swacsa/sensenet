@@ -25,15 +25,6 @@ namespace SenseNet.SearchImpl.Tests.Implementations
         internal InMemoryIndex Index { get; } = new InMemoryIndex();
 
         public bool Running { get; private set; }
-        public bool Paused { get; private set; }
-        public void Pause()
-        {
-            Paused = true;
-        }
-        public void Continue()
-        {
-            Paused = false;
-        }
 
         public void Start(TextWriter consoleOut)
         {
@@ -41,19 +32,9 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             Running = true;
         }
 
-        public void WaitIfIndexingPaused()
-        {
-            // do nothing
-        }
-
         public void ShutDown()
         {
             Running = false;
-        }
-
-        public void Restart()
-        {
-            throw new NotImplementedException();
         }
 
         public void ActivityFinished()
@@ -66,12 +47,17 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             // do nothing
         }
 
+        public void ClearIndex()
+        {
+            Index.Clear();
+        }
+
         public IIndexingActivityStatus ReadActivityStatusFromIndex()
         {
             return IndexingActivityStatus.Startup;
         }
 
-        public IEnumerable<IIndexDocument> GetDocumentsByNodeId(int nodeId)
+        public IEnumerable<IndexDocument> GetDocumentsByNodeId(int nodeId)
         {
             throw new NotImplementedException();
         }

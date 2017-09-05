@@ -743,9 +743,9 @@ namespace SenseNet.ContentRepository.Storage
             return CreateIndexDocumentData(node, completedDocument, bytes, docSize);
         }
 
-        internal static IndexDocumentData CreateIndexDocumentData(Node node, IndexDocument indexDocument, byte[] indexDocumentInfoBytes, long? indexDocumentInfoSize)
+        internal static IndexDocumentData CreateIndexDocumentData(Node node, IndexDocument indexDocument, byte[] serializedIndexDocument, long? indexDocumentSize)
         {
-            return new IndexDocumentData(indexDocument, indexDocumentInfoBytes)
+            return new IndexDocumentData(indexDocument, serializedIndexDocument)
             {
                 NodeTypeId = node.NodeTypeId,
                 VersionId = node.VersionId,
@@ -755,30 +755,10 @@ namespace SenseNet.ContentRepository.Storage
                 IsSystem = node.IsSystem,
                 IsLastDraft = node.IsLatestVersion,
                 IsLastPublic = node.IsLastPublicVersion,
-                IndexDocumentInfoSize = indexDocumentInfoSize,
+                IndexDocumentSize = indexDocumentSize,
                 NodeTimestamp = node.NodeTimestamp,
                 VersionTimestamp = node.VersionTimestamp
             };
         }
-
-        // ====================================================================== Index backup / restore operations
-
-        public static Guid StoreIndexBackupToDb(string backupFilePath, IndexBackupProgress progress)
-        {
-            return DataProvider.StoreIndexBackupToDb(backupFilePath, progress);
-        }
-        public static void RecoverIndexBackupFromDb(string backupFilePath)
-        {
-            DataProvider.RecoverIndexBackupFromDb(backupFilePath);
-        }
-        public static Guid GetLastStoredBackupNumber()
-        {
-            return DataProvider.GetLastStoredBackupNumber();
-        }
-        public static void DeleteUnnecessaryBackups()
-        {
-            DataProvider.DeleteUnnecessaryBackups();
-        }
-
     }
 }

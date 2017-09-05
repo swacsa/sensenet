@@ -1,28 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using SenseNet.ContentRepository.Storage.Search;
+using SenseNet.Search;
 using SenseNet.Search.Indexing;
 using SenseNet.Tools;
 
 namespace SenseNet.SearchImpl.Tests.Implementations
 {
-    internal class TestSearchEngine : ISearchEngine
+    internal class InMemorySearchEngine : ISearchEngine
     {
-        public bool IndexingPaused => false;
-
-        public void PauseIndexing()
-        {
-            IndexManager.PauseIndexing();
-        }
-        public void ContinueIndexing()
-        {
-            IndexManager.ContinueIndexing();
-        }
-        public void WaitIfIndexingPaused()
-        {
-            IndexManager.WaitIfIndexingPaused();
-        }
-
         public IIndexPopulator GetPopulator()
         {
             return new DocumentPopulator();
@@ -52,6 +38,16 @@ namespace SenseNet.SearchImpl.Tests.Implementations
                 }
                 _analyzers = analyzerTypes;
             }
+        }
+
+        public IIndexingEngine GetIndexingEngine() //UNDONE: not tested
+        {
+            return new InMemoryIndexingEngine();
+        }
+
+        public IQueryEngine GetQueryEngine()
+        {
+            throw new NotImplementedException();
         }
     }
 }

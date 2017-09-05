@@ -19,7 +19,7 @@ using SenseNet.Search.Lucene29;
 
 namespace SenseNet.Search.Parser
 {
-    public class QueryFieldValue_OLD : IQueryFieldValue
+    public class QueryFieldValue_OLD : IQueryFieldValue //UNDONE:!!! Delete ASAP
     {
         internal bool IsPhrase { get; private set; }
         internal SnLucLexer.Token Token { get; private set; }
@@ -78,7 +78,7 @@ namespace SenseNet.Search.Parser
         }
     }
 
-    internal class SnLucParser
+    internal class SnLucParser //UNDONE:!!! Delete ASAP
     {
         public enum DefaultOperator { Or, And }
 
@@ -128,7 +128,7 @@ namespace SenseNet.Search.Parser
 
         public SnLucParser()
         {
-            _masterAnalyzer = Lucene29IndexManager.GetAnalyzer();
+            _masterAnalyzer = Lucene29IndexingEngine.GetAnalyzer();
         }
 
         public Query Parse(string queryText)

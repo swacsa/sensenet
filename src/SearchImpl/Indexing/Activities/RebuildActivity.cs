@@ -1,14 +1,11 @@
 ﻿using SenseNet.ContentRepository.Storage;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SenseNet.Search.Indexing.Activities
 {
     [Serializable]
-    internal class RebuildActivity : LuceneIndexingActivity
+    internal class RebuildActivity : IndexingActivityBase
     {
         private static readonly int[] EmptyIntArray = new int[0];
         protected override bool ProtectedExecute()

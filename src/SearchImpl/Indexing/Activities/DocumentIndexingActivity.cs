@@ -1,5 +1,4 @@
 ﻿using System;
-using Lucene.Net.Documents;
 using SenseNet.Diagnostics;
 using Newtonsoft.Json;
 using SenseNet.Configuration;
@@ -47,7 +46,7 @@ namespace SenseNet.Search.Indexing.Activities
     }
 
     [Serializable]
-    internal abstract class LuceneDocumentActivity : LuceneIndexingActivity
+    internal abstract class DocumentIndexingActivity : IndexingActivityBase
     {
         private bool _documentIsCreated;
 
@@ -76,7 +75,7 @@ namespace SenseNet.Search.Indexing.Activities
                 {
                     // create document from indexdocumentdata if it has been supplied (eg via MSMQ if it was small enough to send it over)
                     doc = IndexDocumentData.IndexDocument;
-                    doc = IndexManager.CreateIndexDocument(doc, IndexDocumentData); //UNDONE: refactor IndexDocumentData --> complete IndexDocument
+                    doc = IndexManager.CompleteIndexDocument(IndexDocumentData);
 
                     if (doc == null)
                         SnTrace.Index.Write("LM: LuceneDocumentActivity.CreateDocument (VersionId:{0}): Document is NULL from QUEUE", VersionId);
@@ -108,7 +107,7 @@ namespace SenseNet.Search.Indexing.Activities
         public override void Distribute()
         {
             // check doc size before distributing
-            var sendDocOverMSMQ = IndexDocumentData != null && IndexDocumentData.IndexDocumentInfoSize.HasValue && IndexDocumentData.IndexDocumentInfoSize.Value < Messaging.MsmqIndexDocumentSizeLimit;
+            var sendDocOverMSMQ = IndexDocumentData != null && IndexDocumentData.IndexDocumentSize.HasValue && IndexDocumentData.IndexDocumentSize.Value < Messaging.MsmqIndexDocumentSizeLimit;
 
             if (sendDocOverMSMQ)
             {

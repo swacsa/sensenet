@@ -1,11 +1,9 @@
 ﻿using System;
-using Lucene.Net.Index;
-using SenseNet.Diagnostics;
 
 namespace SenseNet.Search.Indexing.Activities
 {
     [Serializable]
-    internal class RemoveTreeActivity : LuceneTreeActivity
+    internal class RemoveTreeActivity : TreeIndexingActivity
     {
         protected override bool ProtectedExecute()
         {

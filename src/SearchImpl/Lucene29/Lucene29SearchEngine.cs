@@ -4,37 +4,20 @@ using System.Linq;
 using SenseNet.ContentRepository.Storage;
 using SenseNet.ContentRepository.Storage.Search;
 using SenseNet.Search.Indexing;
+using SenseNet.Search.Lucene29;
 using SenseNet.Tools;
 
-namespace SenseNet.Search
+namespace SenseNet.Search.Lucene29
 {
-    public class LuceneSearchEngine : ISearchEngine
+    public class Lucene29SearchEngine : ISearchEngine
     {
         public static readonly Lucene.Net.Util.Version LuceneVersion = Lucene.Net.Util.Version.LUCENE_29;
 
 
-        static LuceneSearchEngine()
+        static Lucene29SearchEngine()
         {
             Lucene.Net.Search.BooleanQuery.SetMaxClauseCount(100000);
         }
-
-        public bool IndexingPaused
-        {
-            get { return IndexManager.Paused; }}
-
-        public void PauseIndexing()
-        {
-            IndexManager.PauseIndexing();
-        }
-        public void ContinueIndexing()
-        {
-            IndexManager.ContinueIndexing();
-        }
-        public void WaitIfIndexingPaused()
-        {
-            IndexManager.WaitIfIndexingPaused();
-        }
-
 
         public IIndexPopulator GetPopulator()
         {
@@ -79,6 +62,16 @@ namespace SenseNet.Search
                 }
                 _analyzers = analyzerTypes;
             }
+        }
+
+        public IIndexingEngine GetIndexingEngine()
+        {
+            return new Lucene29IndexingEngine();
+        }
+
+        public IQueryEngine GetQueryEngine()
+        {
+            return new Lucene29QueryEngine();
         }
     }
 }

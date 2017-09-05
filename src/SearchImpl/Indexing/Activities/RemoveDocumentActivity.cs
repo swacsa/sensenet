@@ -1,12 +1,9 @@
 ﻿using System;
-using Lucene.Net.Index;
-using Lucene.Net.Util;
-using SenseNet.Diagnostics;
 
 namespace SenseNet.Search.Indexing.Activities
 {
     [Serializable]
-    internal class RemoveDocumentActivity : LuceneDocumentActivity
+    internal class RemoveDocumentActivity : DocumentIndexingActivity
     {
         protected override bool ProtectedExecute()
         {

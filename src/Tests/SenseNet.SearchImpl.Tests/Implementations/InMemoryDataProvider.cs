@@ -4,9 +4,11 @@ using System.Data;
 using System.Data.Common;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Xml;
+using Lucene.Net.Support;
 using SenseNet.ContentRepository.Storage;
 using SenseNet.ContentRepository.Storage.Data;
 using SenseNet.ContentRepository.Storage.Data.SqlClient;
@@ -16,11 +18,11 @@ using SenseNet.Security;
 
 namespace SenseNet.SearchImpl.Tests.Implementations
 {
-    internal partial class InMemoryDataProvider : DataProvider
+    public partial class InMemoryDataProvider : DataProvider
     {
         #region NOT IMPLEMENTED
 
-        public override Dictionary<DataType, int> ContentListMappingOffsets
+        public override System.Collections.Generic.Dictionary<DataType, int> ContentListMappingOffsets
         {
             get
             {
@@ -82,12 +84,12 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             return new TestTransaction();
         }
 
-        #region NOT IMPLEMENTED
-
         public override void DeleteAllIndexingActivities()
         {
-            throw new NotImplementedException();
+            _db.IndexingActivity.Clear();
         }
+
+        #region NOT IMPLEMENTED
 
         public override void DeleteAllPackages()
         {
@@ -242,10 +244,60 @@ namespace SenseNet.SearchImpl.Tests.Implementations
         }
         #endregion
 
+
+        #region // ====================================================== Tree lock
+
         protected internal override int AcquireTreeLock(string path)
         {
-            return 1; //UNDONE:!!! TreeLock is not supported
+            var parentChain = GetParentChain(path);
+            var timeMin = GetObsoleteLimitTime();
+
+            if (_db.TreeLocks
+                .Any(t => t.LockedAt > timeMin &&
+                          (parentChain.Contains(t.Path) ||
+                           t.Path.StartsWith(path + "/", StringComparison.InvariantCultureIgnoreCase))))
+            return 0;
+
+            var newTreeLockId = _db.TreeLocks.Count == 0 ? 1 : _db.TreeLocks.Max(t => t.TreeLockId) + 1;
+            _db.TreeLocks.Add(new TreeLockRow
+            {
+                TreeLockId = newTreeLockId,
+                Path = path,
+                LockedAt = DateTime.Now
+            });
+
+            return newTreeLockId;
         }
+        protected internal override bool IsTreeLocked(string path)
+        {
+            var parentChain = GetParentChain(path);
+            var timeMin = GetObsoleteLimitTime();
+
+            return _db.TreeLocks
+                .Any(t => t.LockedAt > timeMin &&
+                          (parentChain.Contains(t.Path) ||
+                           t.Path.StartsWith(path + "/", StringComparison.InvariantCultureIgnoreCase)));
+        }
+        protected internal override System.Collections.Generic.Dictionary<int, string> LoadAllTreeLocks()
+        {
+            return _db.TreeLocks.ToDictionary(t => t.TreeLockId, t => t.Path);
+        }
+
+        private string[] GetParentChain(string path)
+        {
+            var paths = path.Split(RepositoryPath.PathSeparatorChars, StringSplitOptions.RemoveEmptyEntries);
+            paths[0] = "/" + paths[0];
+            for (int i = 1; i < paths.Length; i++)
+                paths[i] = paths[i - 1] + "/" + paths[i];
+            return paths.Reverse().ToArray();
+        }
+        private DateTime GetObsoleteLimitTime()
+        {
+            return DateTime.Now.AddHours(-8.0);
+        }
+
+        #endregion
+
 
         #region NOT IMPLEMENTED
 
@@ -260,11 +312,6 @@ namespace SenseNet.SearchImpl.Tests.Implementations
         }
 
         protected internal override void CopyFromStream(int versionId, string token, Stream input)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected internal override IndexBackup CreateBackup(int backupNumber)
         {
             throw new NotImplementedException();
         }
@@ -361,19 +408,14 @@ namespace SenseNet.SearchImpl.Tests.Implementations
                 .ToList();
         }
 
-        #region NOT IMPLEMENTED
-
         protected internal override IEnumerable<int> GetIdsOfNodesThatDoNotHaveIndexDocument(int fromId, int toId)
         {
-            throw new NotImplementedException();
+            return _db.Versions.Where(v => v.IndexDocument == null).Select(v => v.NodeId).ToArray();
         }
+
+        #region NOT IMPLEMENTED
 
         protected internal override IndexDocumentData GetIndexDocumentDataFromReader(DbDataReader reader)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override Guid GetLastIndexBackupNumber()
         {
             throw new NotImplementedException();
         }
@@ -443,24 +485,6 @@ namespace SenseNet.SearchImpl.Tests.Implementations
         protected internal override bool IsCacheableText(string text)
         {
             return false;
-        }
-
-        protected internal override bool IsTreeLocked(string path)
-        {
-            return false; //UNDONE:!!! TreeLock is not supported
-        }
-
-        #region NOT IMPLEMENTED
-
-        protected override void KeepOnlyLastIndexBackup()
-        {
-            throw new NotImplementedException();
-        }
-        #endregion
-
-        protected internal override Dictionary<int, string> LoadAllTreeLocks()
-        {
-            return new Dictionary<int, string>(); //UNDONE:!!! TreeLock is not supported
         }
 
         protected internal override BinaryCacheEntity LoadBinaryCacheEntity(int nodeVersionId, int propertyTypeId)
@@ -626,15 +650,6 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             return result;
         }
 
-        #region NOT IMPLEMENTED
-
-        protected internal override IndexBackup LoadLastBackup()
-        {
-            throw new NotImplementedException();
-        }
-
-        #endregion
-
         protected internal override NodeHead LoadNodeHead(int nodeId)
         {
             return CreateNodeHead(_db.Nodes.FirstOrDefault(r => r.NodeId == nodeId));
@@ -668,7 +683,7 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             return _db.Nodes.Where(n => heads.Contains(n.NodeId)).Select(CreateNodeHead);
         }
 
-        protected internal override void LoadNodes(Dictionary<int, NodeBuilder> buildersByVersionId)
+        protected internal override void LoadNodes(System.Collections.Generic.Dictionary<int, NodeBuilder> buildersByVersionId)
         {
             foreach (var versionId in buildersByVersionId.Keys)
             {
@@ -711,7 +726,7 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             throw new NotImplementedException();
         }
         #endregion
-        protected internal override Dictionary<int, string> LoadTextPropertyValues(int versionId, int[] propertyTypeIds)
+        protected internal override System.Collections.Generic.Dictionary<int, string> LoadTextPropertyValues(int versionId, int[] propertyTypeIds)
         {
             return _db.TextProperties
                 .Where(t => t.VersionId == versionId && propertyTypeIds.Contains(t.PropertyTypeId))
@@ -724,11 +739,20 @@ namespace SenseNet.SearchImpl.Tests.Implementations
         {
             throw new NotImplementedException();
         }
+        #endregion 
 
         protected override int NodeCount(string path)
         {
-            throw new NotImplementedException();
+            return (string.IsNullOrEmpty(path) || path == RepositoryPath.PathSeparator)
+                ? _db.Nodes.Count
+                : _db.Nodes.Count(
+                    n =>
+                        n.Path.StartsWith(path + RepositoryPath.PathSeparator,
+                            StringComparison.InvariantCultureIgnoreCase)
+                        || n.Path.Equals(path, StringComparison.InvariantCultureIgnoreCase));
         }
+
+        #region NOT IMPLEMENTED
 
         protected override bool NodeExistsInDatabase(string path)
         {
@@ -744,34 +768,51 @@ namespace SenseNet.SearchImpl.Tests.Implementations
         {
             throw new NotImplementedException();
         }
+        #endregion
 
         protected internal override IEnumerable<int> QueryNodesByType(int[] typeIds)
         {
-            throw new NotImplementedException();
+            return QueryNodesByTypeAndPath(typeIds, new string[0], false);
         }
 
         protected internal override IEnumerable<int> QueryNodesByTypeAndPath(int[] nodeTypeIds, string[] pathStart, bool orderByPath)
         {
-            throw new NotImplementedException();
+            return QueryNodesByTypeAndPathAndName(nodeTypeIds, pathStart, orderByPath, null);
         }
-        #endregion
 
         protected internal override IEnumerable<int> QueryNodesByTypeAndPath(int[] nodeTypeIds, string pathStart, bool orderByPath)
         {
-            var types = nodeTypeIds.ToList();
-            var nodes = _db.Nodes.Where(n => types.Contains(n.NodeTypeId) && n.Path.StartsWith(pathStart));
+            return QueryNodesByTypeAndPathAndName(nodeTypeIds, new[] { pathStart }, orderByPath, null);
+        }
+
+        protected internal override IEnumerable<int> QueryNodesByTypeAndPathAndName(int[] nodeTypeIds, string[] pathStart, bool orderByPath, string name)
+        {
+            var nodes = _db.Nodes;
+            if (nodeTypeIds != null)
+                nodes = nodes
+                    .Where(n => nodeTypeIds.Contains(n.NodeTypeId))
+                    .ToList();
+
+            if (name != null)
+                nodes = nodes
+                    .Where(n => n.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase))
+                    .ToList();
+
+            if (pathStart != null)
+                nodes = nodes
+                    .Where(n => pathStart.Any(p => n.Path.StartsWith(p, StringComparison.InvariantCultureIgnoreCase)))
+                    .ToList();
+
             if (orderByPath)
-                nodes = nodes.OrderBy(n => n.Path);
+                nodes = nodes
+                    .OrderBy(n => n.Path)
+                    .ToList();
+
             var ids = nodes.Select(n => n.NodeId);
             return ids.ToArray();
         }
 
         #region NOT IMPLEMENTED
-
-        protected internal override IEnumerable<int> QueryNodesByTypeAndPathAndName(int[] nodeTypeIds, string[] pathStart, bool orderByPath, string name)
-        {
-            throw new NotImplementedException();
-        }
 
         protected internal override IEnumerable<int> QueryNodesByTypeAndPathAndName(int[] nodeTypeIds, string pathStart, bool orderByPath, string name)
         {
@@ -782,16 +823,12 @@ namespace SenseNet.SearchImpl.Tests.Implementations
         {
             throw new NotImplementedException();
         }
-
-        protected override IndexBackup RecoverIndexBackup(string backupFilePath)
-        {
-            throw new NotImplementedException();
-        }
         #endregion
 
         protected internal override void ReleaseTreeLock(int[] lockIds)
         {
-            //UNDONE:!!! TreeLock is not supported
+            foreach (var item in _db.TreeLocks.Where(t => lockIds.Contains(t.TreeLockId)).ToArray())
+                _db.TreeLocks.Remove(item);
         }
 
         #region NOT IMPLEMENTED
@@ -801,17 +838,7 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             throw new NotImplementedException();
         }
 
-        protected internal override void SetActiveBackup(IndexBackup backup, IndexBackup lastBackup)
-        {
-            throw new NotImplementedException();
-        }
-
         protected internal override string StartChunk(int versionId, int propertyTypeId, long fullSize)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected internal override void StoreBackupStream(string backupFilePath, IndexBackup backup, IndexBackupProgress progress)
         {
             throw new NotImplementedException();
         }
@@ -833,12 +860,22 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             versionRow.IndexDocument = indexDocumentBytes;
         }
 
-        #region NOT IMPLEMENTED
-
         protected override int VersionCount(string path)
         {
-            throw new NotImplementedException();
+            if (string.IsNullOrEmpty(path) || path == RepositoryPath.PathSeparator)
+                return _db.Versions.Count;
+
+            var count = _db.Nodes.Join(_db.Versions, n => n.NodeId, v => v.NodeId,
+                    (node, version) => new {Node = node, Version = version})
+                .Count(
+                    x =>
+                        x.Node.Path.StartsWith(path + RepositoryPath.PathSeparator,
+                            StringComparison.InvariantCultureIgnoreCase)
+                        || x.Node.Path.Equals(path, StringComparison.InvariantCultureIgnoreCase));
+            return count;
         }
+
+        #region NOT IMPLEMENTED
 
         protected internal override void WriteChunk(int versionId, string token, byte[] buffer, long offset, long fullSize)
         {
@@ -874,12 +911,12 @@ namespace SenseNet.SearchImpl.Tests.Implementations
         #region CREATION
 
         // Preloade CTD bytes by name
-        private static readonly Dictionary<string, byte[]> ContentTypeBytes;
+        private static readonly System.Collections.Generic.Dictionary<string, byte[]> ContentTypeBytes;
         static InMemoryDataProvider()
         {
             // Preload CTD bytes from disk to avoid heavy IO charging
 
-            ContentTypeBytes = new Dictionary<string, byte[]>();
+            ContentTypeBytes = new System.Collections.Generic.Dictionary<string, byte[]>();
 
             var ctdDirectory = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
                 @"..\..\..\..\nuget\snadmin\install-services\import\System\Schema\ContentTypes"));
@@ -1065,6 +1102,7 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             public List<FileRecord> Files;
             public List<TextPropertyRecord> TextProperties;
             public List<IndexingActivityRecord> IndexingActivity = new List<IndexingActivityRecord>();
+            public List<TreeLockRow> TreeLocks = new List<TreeLockRow>();
         }
         private class InMemoryNodeWriter : INodeWriter
         {
@@ -1083,6 +1121,9 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             {
                 // do nothing
             }
+
+            /*============================================================================ Node Insert/Update */
+
             public void InsertNodeAndVersionRows(NodeData nodeData, out int lastMajorVersionId, out int lastMinorVersionId)
             {
                 var newNodeId = _db.Nodes.Max(r => r.NodeId) + 1;
@@ -1140,6 +1181,7 @@ namespace SenseNet.SearchImpl.Tests.Implementations
                 nodeData.NodeTimestamp = nodeTimeStamp;
                 nodeData.VersionTimestamp = versionTimestamp;
             }
+
             public void UpdateSubTreePath(string oldPath, string newPath)
             {
                 var oldPathExt = oldPath + "/";
@@ -1147,7 +1189,6 @@ namespace SenseNet.SearchImpl.Tests.Implementations
                 foreach (var nodeRow in _db.Nodes.Where(n => n.Path.StartsWith(oldPathExt)))
                     nodeRow.Path = nodeRow.Path.Replace(oldPathExt, newPathExt);
             }
-
             public void UpdateNodeRow(NodeData nodeData)
             {
                 var nodeId = nodeData.Id;
@@ -1183,6 +1224,8 @@ namespace SenseNet.SearchImpl.Tests.Implementations
                 nodeRec.OwnerId = nodeData.OwnerId;
                 nodeRec.SavingState = nodeData.SavingState;
             }
+
+            /*============================================================================ Version Insert/Update */
 
             public void UpdateVersionRow(NodeData nodeData, out int lastMajorVersionId, out int lastMinorVersionId)
             {
@@ -1232,6 +1275,9 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             {
                 throw new NotImplementedException();
             }
+
+            // ============================================================================ Property Insert/Update
+
             public void SaveStringProperty(int versionId, PropertyType propertyType, string value)
             {
                 //TODO:! InMemoryDataProvider: dynamic property not supported
@@ -1248,7 +1294,6 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             {
                 //TODO:! InMemoryDataProvider: dynamic property not supported
             }
-
             public void SaveTextProperty(int versionId, PropertyType propertyType, bool isLoaded, string value)
             {
                 //TODO:! InMemoryDataProvider: dynamic property not supported
@@ -1257,6 +1302,8 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             {
                 //TODO:! InMemoryDataProvider: dynamic property not supported
             }
+
+
             public void InsertBinaryProperty(BinaryDataValue value, int versionId, int propertyTypeId, bool isNewNode)
             {
                 //TODO:! InMemoryDataProvider: dynamic property not supported
@@ -1357,6 +1404,14 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             public string Path;
             public string Extension;
         }
+
+        private class TreeLockRow
+        {
+            public int TreeLockId;
+            public string Path;
+            public DateTime LockedAt;
+        }
         #endregion
     }
 }
+

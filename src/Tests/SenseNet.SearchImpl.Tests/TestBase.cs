@@ -2,13 +2,16 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SenseNet.Configuration;
 using SenseNet.ContentRepository;
 using SenseNet.ContentRepository.Security;
 using SenseNet.ContentRepository.Storage;
 using SenseNet.ContentRepository.Storage.Data;
 using SenseNet.ContentRepository.Storage.Security;
+using SenseNet.Search;
 using SenseNet.Search.Indexing;
+using SenseNet.Search.Lucene29;
 using SenseNet.SearchImpl.Tests.Implementations;
 using SenseNet.Security;
 using SenseNet.Security.Data;
@@ -16,8 +19,10 @@ using SenseNet.Security.Messaging;
 
 namespace SenseNet.SearchImpl.Tests
 {
+    [TestClass]
     public class TestBase
     {
+
         protected T Test<T>(Func<T> callback)
         {
             TypeHandler.Initialize(new Dictionary<Type, Type[]>
@@ -30,9 +35,7 @@ namespace SenseNet.SearchImpl.Tests
 
             DistributedApplication.Cache.Reset();
 
-            using (new Tools.SearchEngineSwindler(new TestSearchEngine()))
-            //using (Tools.Swindle(typeof(IndexManager), "_indexingEngineFactory", new InMemoryIndexingEngineFactory()))
-            //using (Tools.Swindle(typeof(StorageContext.Search), "ContentRepository", new TestSearchEngineSupport(DefaultIndexingInfo)))
+            using (new Tools.SearchEngineSwindler(new InMemorySearchEngine()))
             using (Tools.Swindle(typeof(StorageContext.Search), "ContentRepository", new SearchEngineSupport()))
             using (Tools.Swindle(typeof(AccessProvider), "_current", new DesktopAccessProvider()))
             using (Tools.Swindle(typeof(DataProvider), "_current", dataProvider))
@@ -43,7 +46,8 @@ namespace SenseNet.SearchImpl.Tests
                 return callback();
             }
         }
-        private void StartSecurity(InMemoryDataProvider repo)
+
+        protected void StartSecurity(InMemoryDataProvider repo)
         {
             var securityDataProvider = new MemoryDataProvider(new DatabaseStorage
             {
@@ -65,6 +69,21 @@ namespace SenseNet.SearchImpl.Tests
             });
 
             SecurityHandler.StartSecurity(false, securityDataProvider, new DefaultMessageProvider());
+        }
+
+        protected void SaveInitialIndexDocuments()
+        {
+            var idSet = DataProvider.LoadIdsOfNodesThatDoNotHaveIndexDocument(0, 1100);
+            var nodes = Node.LoadNodes(idSet);
+
+            if (nodes.Count == 0)
+                return;
+
+            foreach (var node in nodes)
+            {
+                bool hasBinary;
+                DataBackingStore.SaveIndexDocument(node, false, false, out hasBinary);
+            }
         }
 
     }

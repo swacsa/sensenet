@@ -19,8 +19,7 @@ namespace SenseNet.ContentRepository.Storage.Search
         string Name { get; }
         bool IsInIndex { get; }
         bool IsBinaryField { get; }
-        IEnumerable<IIndexFieldInfo> GetIndexFieldInfos(out string textExtract); //UNDONE:!!!!!!!!! DELETE GetIndexFieldInfos
-        IEnumerable<IndexField> GetIndexFields(out string textExtract); //UNDONE:!!!!!!!!! GetIndexFieldInfos -> GetIndexField
+        IEnumerable<IndexField> GetIndexFields(out string textExtract);
     }
     public interface IIndexValueConverter<T>
     {
@@ -39,34 +38,19 @@ namespace SenseNet.ContentRepository.Storage.Search
 
     public interface ISearchEngine
     {
-        bool IndexingPaused { get; }
-        void PauseIndexing();
-        void ContinueIndexing();
-        void WaitIfIndexingPaused();
-
         IIndexPopulator GetPopulator(); //UNDONE: not SearchEngine responsibility: GetPopulator()
 
         IDictionary<string, Type> GetAnalyzers();
 
         void SetIndexingInfo(object indexingInfo);
+
+        IIndexingEngine GetIndexingEngine();
+
+        IQueryEngine GetQueryEngine();
     }
     public class InternalSearchEngine : ISearchEngine
     {
         public static InternalSearchEngine Instance = new InternalSearchEngine();
-
-        public bool IndexingPaused { get { return false; } }
-        public void PauseIndexing()
-        {
-            // do nothing;
-        }
-        public void ContinueIndexing()
-        {
-            // do nothing;
-        }
-        public void WaitIfIndexingPaused()
-        {
-            // do nothing;
-        }
 
         public IIndexPopulator GetPopulator()
         {
@@ -79,6 +63,16 @@ namespace SenseNet.ContentRepository.Storage.Search
         public void SetIndexingInfo(object indexingInfo)
         {
             // do nothing
+        }
+
+        public IIndexingEngine GetIndexingEngine()
+        {
+            throw new SnNotSupportedException();
+        }
+
+        public IQueryEngine GetQueryEngine()
+        {
+            throw new SnNotSupportedException();
         }
     }
 
