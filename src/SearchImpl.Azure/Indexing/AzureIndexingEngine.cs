@@ -2,13 +2,18 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Search;
 using Microsoft.Azure.Search.Models;
 using SenseNet.Search.Azure.Indexing.Models;
+using SenseNet.Search.Azure.Querying;
+using SenseNet.Search.Azure.Querying.Models;
 using SenseNet.Search.Indexing;
 using IndexBatch = Microsoft.Azure.Search.Models.IndexBatch;
+using SenseNet.Portal.Virtualization;
+using SenseNet.ContentRepository.Storage.Security;
 
 namespace SenseNet.Search.Azure.Indexing
 {
@@ -29,12 +34,14 @@ namespace SenseNet.Search.Azure.Indexing
         private static IDocumentsOperations _documents;
         //private Dictionary<string, List<string>> _customHeaders = null;
 
-        private static IActivityQueueConnector _queueConnector;
+        //private static IActivityQueueConnector _queueConnector;
+        private AzureQueryExecutor _queryExecutor;
 
         public AzureIndexingEngine()
         {
             if (_credentials == null)
             {
+                _queryExecutor = new AzureQueryExecutor(new AzureQueryEngine());
                 _credentials = new SearchCredentials(_apiKey);
                 _indexClient = new SearchIndexClient(_serviceName, _indexName, _credentials);
                 _indexClient.BaseUri = new Uri(_schema + _serviceName + "." + _dnsSuffix + _indexName);
@@ -150,20 +157,117 @@ namespace SenseNet.Search.Azure.Indexing
 
         public IIndexingActivityStatus ReadActivityStatusFromIndex()
         {
-            return CompletionState.ParseFromReader(_queueConnector.GetCompletionInfo());
+            return null; //CompletionState.ParseFromReader(_queueConnector.GetCompletionInfo());
         }
 
-        public IEnumerable<IIndexDocument> GetDocumentsByNodeId(int nodeId)
+        public IEnumerable<IndexDocument> GetDocumentsByNodeId(int nodeId)
         {
             throw new NotImplementedException();
         }
 
         public void Actualize(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates)
         {
+            var dels = deletions.ToArray();
+            if (dels.Length > 0)
+            {
+                string filter;
+                var searchText = GetFilterCondition(dels, out filter);
+                AzureSearchParameters queryParameters = new AzureSearchParameters {SearchText = searchText, Filter = filter};
+                PermissionChecker permisionChecker = new PermissionChecker(AccessProvider.Current.GetCurrentUser(), QueryFieldLevel.HeadOnly, true);
+                _queryExecutor.Initialize(queryParameters, permisionChecker);
+                var deletables = _queryExecutor.Execute();
+            }
+        }
+
+        private string GetFilterCondition(IEnumerable<SnTerm> terms, out string filter)
+        {
+            var searchText = new StringBuilder();
+            var filterText = new StringBuilder();
+            filter = "";
+            // we take only the first 1024 terms, because of the explicit constraint in Azure Search
+            foreach (var term in terms.Take(1024))
+            {
+                if (searchText.Length > 0)
+                {
+                    searchText.Append(" ");
+                }
+                string filterPart;
+                searchText.Append(GetFilter(term, out filterPart));
+                if (filterText.Length > 0 && filter.Length > 0)
+                {
+                    filterText.Append(" ");
+                    filterText.Append(filterPart);
+                }
+            }
+            filter = filterText.ToString();
+            return searchText.ToString();
+        }
+        private string GetFilter(SnTerm term, out string filter)
+        {
+            var searchText = new StringBuilder();
+            var filterText = new StringBuilder();
+            filter = "";
+
+            if (term.Type == SnTermType.StringArray)
+            {
+                filterText.Append("search.in(");
+                filterText.Append(term.Name);
+                filterText.Append(",");
+                foreach (var value in term.StringArrayValue)
+                {
+                    filterText.Append(value);
+                }
+                filterText.Remove(filterText.Length - 1, 1);
+                filterText.Append("')");
+                filter = filterText.ToString();
+                return searchText.ToString();
+            }
+            // else
+            searchText.Append($"{term.Name.Replace("#", "")}:");
+            switch (term.Type)
+            {
+                case SnTermType.String:
+                    var phrase = term.StringValue.WordCount() > 1;
+                    if (phrase)
+                    {
+                        searchText.Append("\"");
+                    }
+                    searchText.Append(term.StringValue);
+                    if (phrase)
+                    {
+                        searchText.Append("\"");
+                    }
+                    break;
+                case SnTermType.Bool:
+                    searchText.Append(term.BooleanValue);break;
+                case SnTermType.Int:
+                    searchText.Append(term.IntegerValue);break;
+                case SnTermType.Long:
+                    searchText.Append(term.LongValue);break;
+                case SnTermType.Float:
+                    searchText.Append(term.SingleValue);break;
+                case SnTermType.Double:
+                    searchText.Append(term.DoubleValue);break;
+                case SnTermType.DateTime:
+                    searchText.Append(GetODataV4DateTimeString(term.DateTimeValue)); break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+            return searchText.ToString();
+        }
+
+        private string GetODataV4DateTimeString(DateTime datetime)
+        {
+            var utc = datetime.ToUniversalTime();
+            var result = $"{utc.Year}-{utc.Month}-{utc.Day}T{utc.Hour}:{utc.Minute}:{utc.Second}.{utc.Millisecond}Z";
+            return result;
+        }
+        public void Actualize(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> addition)
+        {
             throw new NotImplementedException();
         }
 
-        public void Actualize(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> addition)
+        public void ClearIndex()
         {
             throw new NotImplementedException();
         }

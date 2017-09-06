@@ -4,7 +4,7 @@ using SenseNet.Search.Indexing;
 
 namespace SenseNet.Search.Lucene29
 {
-    public class IndexReaderFrame : IDisposable, IIndexReader
+    public class IndexReaderFrame : IDisposable
     {
         private readonly IndexReader _reader;
         public IndexReader IndexReader => _reader;
@@ -25,9 +25,5 @@ namespace SenseNet.Search.Lucene29
             return ((Lucene29IndexingEngine)IndexManager.IndexingEngine).GetIndexReaderFrame(dirty); //UNDONE: refactor: do not use member of another class
         }
 
-        public IDictionary<string, string> GetCompletionInfo()
-        {
-            return _reader.GetCommitUserData();
-        }
     }
 }

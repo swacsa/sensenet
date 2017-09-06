@@ -294,7 +294,7 @@ namespace SenseNet.Search.Lucene29
         {
             using (var readerFrame = GetIndexReaderFrame())
             {
-                return CompletionState.ParseFromReader(readerFrame.GetCompletionInfo());
+                return CompletionState.ParseFromReader(readerFrame.IndexReader);
             }
         }
 

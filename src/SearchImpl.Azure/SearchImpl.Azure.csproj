@@ -50,9 +50,18 @@
       <HintPath>..\packages\Newtonsoft.Json.9.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="SenseNet.Security, Version=2.3.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\SenseNet.Security.2.3.1\lib\net45\SenseNet.Security.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="SenseNet.Tools, Version=2.1.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\SenseNet.Tools.2.1.1\lib\net451\SenseNet.Tools.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.DataAnnotations" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Web" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -87,6 +96,14 @@
     <ProjectReference Include="..\Search\Search.csproj">
       <Project>{0279705b-779d-485d-86b9-f7ab3dd1f2c3}</Project>
       <Name>Search</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Services\Services.csproj">
+      <Project>{B72529C8-FEB1-49F5-B08B-56055B58F296}</Project>
+      <Name>Services</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Storage\Storage.csproj">
+      <Project>{5DB4DDBA-81F6-4D81-943A-18F3178B3355}</Project>
+      <Name>Storage</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup />

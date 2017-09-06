@@ -11,7 +11,7 @@ namespace SenseNet.Search.Azure.Querying
     {
         private PermissionChecker _permissionChecker;
         private AzureSearchParameters _queryParameters;
-        public AzureSearchParameters QuerParameters => _queryParameters;
+        public AzureSearchParameters QueryParameters => _queryParameters;
         public PermissionChecker PermissionChecker => _permissionChecker;
 
         private AzureQueryEngine _queryEngine;

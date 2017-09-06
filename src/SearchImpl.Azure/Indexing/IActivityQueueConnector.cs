@@ -2,8 +2,8 @@
 
 namespace SenseNet.Search.Azure.Indexing
 {
-    public interface IActivityQueueConnector: IIndexReader
-    {
+    public interface IActivityQueueConnector
+    { 
         
     }
 }
