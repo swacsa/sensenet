@@ -35,6 +35,11 @@ namespace SenseNet.Search.Azure.Querying
             }
         }
 
+        public AzureQueryEngine(IDocumentsOperations documentsOperations)
+        {
+            _documents = documentsOperations;
+        }
+
         public Task<DocumentSearchResult> SearchAsync(out CancellationToken cancellationToken, AzureSearchParameters searchParameters = null)
         {
             cancellationToken = new CancellationToken();
@@ -47,7 +52,8 @@ namespace SenseNet.Search.Azure.Querying
 
         public DocumentSearchResult Search(AzureSearchParameters searchParameters)
         {
-            return _documents.Search(searchParameters.SearchText, (SearchParameters)searchParameters);
+            return _documents.SearchWithHttpMessagesAsync(searchParameters.SearchText, (SearchParameters)searchParameters).Result.Body;
+            //return _documents.Search(searchParameters.SearchText, (SearchParameters)searchParameters);
         }
 
         public Task<DocumentSearchResult> CountAsync(out CancellationToken cancellationToken, AzureSearchParameters searchParameters = null)

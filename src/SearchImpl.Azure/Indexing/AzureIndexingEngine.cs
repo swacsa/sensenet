@@ -35,18 +35,21 @@ namespace SenseNet.Search.Azure.Indexing
         //private Dictionary<string, List<string>> _customHeaders = null;
 
         //private static IActivityQueueConnector _queueConnector;
-        private AzureQueryExecutor _queryExecutor;
+        //private AzureQueryExecutor _queryExecutor;
+        private AzureQueryEngine _queryEngine;
 
-        public AzureIndexingEngine()
+        public AzureIndexingEngine(AzureQueryEngine queryEngine, IDocumentsOperations documents)
         {
             if (_credentials == null)
             {
-                _queryExecutor = new AzureQueryExecutor(new AzureQueryEngine());
-                _credentials = new SearchCredentials(_apiKey);
-                _indexClient = new SearchIndexClient(_serviceName, _indexName, _credentials);
-                _indexClient.BaseUri = new Uri(_schema + _serviceName + "." + _dnsSuffix + _indexName);
-                _indexClient.LongRunningOperationRetryTimeout = _operationTimeout;
-                _documents = _indexClient.Documents;
+                //_queryExecutor = new AzureQueryExecutor(new AzureQueryEngine());
+                _queryEngine = queryEngine;
+                //_credentials = new SearchCredentials(_apiKey);
+                //_indexClient = new SearchIndexClient(_serviceName, _indexName, _credentials);
+                //_indexClient.BaseUri = new Uri(_schema + _serviceName + "." + _dnsSuffix + _indexName);
+                //_indexClient.LongRunningOperationRetryTimeout = _operationTimeout;
+                //_documents = _indexClient.Documents;
+                _documents = documents;
             }
         }
         #region Azure calls
@@ -71,7 +74,8 @@ namespace SenseNet.Search.Azure.Indexing
         {
             try
             {
-                return (AzureDocumentIndexResult) _documents.Index(batch);
+                return (AzureDocumentIndexResult)_documents.IndexWithHttpMessagesAsync(batch).Result.Body;
+                //return (AzureDocumentIndexResult) _documents.Index(batch);
             }
             catch (Exception ex)
             {
@@ -96,20 +100,20 @@ namespace SenseNet.Search.Azure.Indexing
             return (int) Math.Pow(2, tryCount);
         }
 
-        public Task<AzureDocumentIndexResult> DeleteAsync<T>(IEnumerable<T> keys) where T : IndexDocument
+        public Task<AzureDocumentIndexResult> DeleteAsync<T>(IEnumerable<T> documents) where T : IndexDocument
         {
             var cancellationToken = new CancellationToken();
-            if (keys == null)
+            if (documents == null)
             {
                 throw new ArgumentNullException("keys");
             }
-            return Task.Factory.StartNew(() => Delete(keys), cancellationToken);
+            return Task.Factory.StartNew(() => Delete(documents), cancellationToken);
         }
 
-        public AzureDocumentIndexResult Delete<T>(IEnumerable<T> keys) where T : IndexDocument
+        public AzureDocumentIndexResult Delete<T>(IEnumerable<T> documents) where T : IndexDocument
         {
             //return Index( IndexBatch.Delete((IndexFieldName.Name, keys), 1);
-            return Index(IndexBatch.Delete(keys), 1);
+            return Index(IndexBatch.Delete(documents), 1);
         }
 
         #endregion
@@ -167,16 +171,36 @@ namespace SenseNet.Search.Azure.Indexing
 
         public void Actualize(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates)
         {
-            var dels = deletions.ToArray();
-            if (dels.Length > 0)
-            {
+            var indexActions = new List<IndexAction<IndexDocument>>();
+            if (deletions != null)
+            { 
+                var dels = deletions.ToArray();
                 string filter;
                 var searchText = GetFilterCondition(dels, out filter);
                 AzureSearchParameters queryParameters = new AzureSearchParameters {SearchText = searchText, Filter = filter};
-                PermissionChecker permisionChecker = new PermissionChecker(AccessProvider.Current.GetCurrentUser(), QueryFieldLevel.HeadOnly, true);
-                _queryExecutor.Initialize(queryParameters, permisionChecker);
-                var deletables = _queryExecutor.Execute();
+                //PermissionChecker permisionChecker = new PermissionChecker(AccessProvider.Current.GetCurrentUser(), QueryFieldLevel.HeadOnly, true);
+                var deletables = _queryEngine.Search(queryParameters).Results.Select(r => r.Document).ToArray(); 
+                //_queryExecutor.Initialize(queryParameters, permisionChecker);
+                //var deletables = _queryExecutor.Execute();
+                if (deletables.Any())
+                {
+                    indexActions.AddRange(deletables.Select(d =>
+                    {
+                        var document = new IndexDocument {};
+                        document.Add(new IndexField("VersionId", int.Parse(d.Keys.First(k => k == "VersionId")), IndexingMode.NotAnalyzed, IndexStoringMode.Yes, IndexTermVector.Default ));
+                        return IndexAction.Delete(document);
+                    }));
+                }
             }
+            if (updates != null)
+            {
+                indexActions.AddRange(updates.Select(u => IndexAction.Merge(u.Document)));
+            }
+            if (addition != null)
+            {
+                indexActions.Add(IndexAction.MergeOrUpload(addition));
+            }
+            Index(new IndexBatch<IndexDocument>(indexActions), 1);
         }
 
         private string GetFilterCondition(IEnumerable<SnTerm> terms, out string filter)
