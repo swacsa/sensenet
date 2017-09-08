@@ -50,7 +50,7 @@ namespace SenseNet.Search.Azure.Querying
             return Task.Factory.StartNew(()=>Search(searchParameters), cancellationToken);
         }
 
-        public DocumentSearchResult Search(AzureSearchParameters searchParameters)
+        public virtual DocumentSearchResult Search(AzureSearchParameters searchParameters)
         {
             return _documents.SearchWithHttpMessagesAsync(searchParameters.SearchText, (SearchParameters)searchParameters).Result.Body;
             //return _documents.Search(searchParameters.SearchText, (SearchParameters)searchParameters);

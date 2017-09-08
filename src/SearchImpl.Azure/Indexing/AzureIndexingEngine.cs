@@ -17,6 +17,7 @@ using SenseNet.ContentRepository.Storage.Security;
 
 namespace SenseNet.Search.Azure.Indexing
 {
+    // Azure Search API Version: 2016-09-01
     public class AzureIndexingEngine: IIndexingEngine
     {
         private static string _apiKey = "";
@@ -24,7 +25,6 @@ namespace SenseNet.Search.Azure.Indexing
         private static string _serviceName = "";
         private static string _indexName = "";
         private static string _dnsSuffix = "search.windows.net/indexes/";
-        //private static string _apiVersion = "2016-09-01";
         private static int? _operationTimeout = 60;
         //private static int _top = 1000;
         private static int _maxTryCount = 5;
@@ -75,7 +75,6 @@ namespace SenseNet.Search.Azure.Indexing
             try
             {
                 return (AzureDocumentIndexResult)_documents.IndexWithHttpMessagesAsync(batch).Result.Body;
-                //return (AzureDocumentIndexResult) _documents.Index(batch);
             }
             catch (Exception ex)
             {
@@ -171,6 +170,11 @@ namespace SenseNet.Search.Azure.Indexing
 
         public void Actualize(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates)
         {
+            ActualizePrivate(deletions, new [] {addition}, updates);
+        }
+
+        private void ActualizePrivate(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> additions, IEnumerable<DocumentUpdate> updates) 
+        {
             var indexActions = new List<IndexAction<IndexDocument>>();
             if (deletions != null)
             { 
@@ -187,7 +191,7 @@ namespace SenseNet.Search.Azure.Indexing
                     indexActions.AddRange(deletables.Select(d =>
                     {
                         var document = new IndexDocument {};
-                        document.Add(new IndexField("VersionId", int.Parse(d.Keys.First(k => k == "VersionId")), IndexingMode.NotAnalyzed, IndexStoringMode.Yes, IndexTermVector.Default ));
+                        document.Add(new IndexField("VersionId", int.Parse(d["VersionId"].ToString()), IndexingMode.NotAnalyzed, IndexStoringMode.Yes, IndexTermVector.Default ));
                         return IndexAction.Delete(document);
                     }));
                 }
@@ -196,9 +200,9 @@ namespace SenseNet.Search.Azure.Indexing
             {
                 indexActions.AddRange(updates.Select(u => IndexAction.Merge(u.Document)));
             }
-            if (addition != null)
+            if (additions != null)
             {
-                indexActions.Add(IndexAction.MergeOrUpload(addition));
+                indexActions.AddRange(additions.Select(IndexAction.MergeOrUpload));
             }
             Index(new IndexBatch<IndexDocument>(indexActions), 1);
         }
@@ -273,22 +277,22 @@ namespace SenseNet.Search.Azure.Indexing
                 case SnTermType.Double:
                     searchText.Append(term.DoubleValue);break;
                 case SnTermType.DateTime:
-                    searchText.Append(GetODataV4DateTimeString(term.DateTimeValue)); break;
+                    searchText.Append(GetODataV4DateTimeUtcString(term.DateTimeValue)); break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
             return searchText.ToString();
         }
 
-        private string GetODataV4DateTimeString(DateTime datetime)
+        private string GetODataV4DateTimeUtcString(DateTime datetime)
         {
             var utc = datetime.ToUniversalTime();
             var result = $"{utc.Year}-{utc.Month}-{utc.Day}T{utc.Hour}:{utc.Minute}:{utc.Second}.{utc.Millisecond}Z";
             return result;
         }
-        public void Actualize(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> addition)
+        public void Actualize(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> additions)
         {
-            throw new NotImplementedException();
+            ActualizePrivate(deletions, additions, null);
         }
 
         public void ClearIndex()
