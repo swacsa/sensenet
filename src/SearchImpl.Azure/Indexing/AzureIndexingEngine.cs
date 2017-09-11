@@ -221,9 +221,12 @@ namespace SenseNet.Search.Azure.Indexing
                 }
                 string filterPart;
                 searchText.Append(GetFilter(term, out filterPart));
-                if (filterText.Length > 0 && filter.Length > 0)
+                if (filterPart.Length > 0)
                 {
-                    filterText.Append(" ");
+                    if (filterText.Length > 0)
+                    {
+                        filterText.Append(" ");
+                    }
                     filterText.Append(filterPart);
                 }
             }
@@ -240,12 +243,17 @@ namespace SenseNet.Search.Azure.Indexing
             {
                 filterText.Append("search.in(");
                 filterText.Append(term.Name);
-                filterText.Append(",");
+                filterText.Append(",'");
+                var notFirst = false;
                 foreach (var value in term.StringArrayValue)
                 {
+                    if (notFirst)
+                    {
+                        filterText.Append(",");
+                    }
                     filterText.Append(value);
+                    notFirst = true;
                 }
-                filterText.Remove(filterText.Length - 1, 1);
                 filterText.Append("')");
                 filter = filterText.ToString();
                 return searchText.ToString();
