@@ -15,8 +15,7 @@ namespace SenseNet.Search.Indexing
     {
         #region /* ==================================================================== Managing index */
 
-        private static IIndexingEngineFactory _indexingEngineFactory;
-        internal static IIndexingEngine IndexingEngine => _indexingEngineFactory.CreateIndexingEngine();
+        internal static IIndexingEngine IndexingEngine => StorageContext.Search.SearchEngine.IndexingEngine;
 
         public static bool Running => IndexingEngine.Running;
 
@@ -25,9 +24,8 @@ namespace SenseNet.Search.Indexing
             return StorageContext.Search.ContentRepository.GetNotIndexedNodeTypeIds();
         }
 
-        public static void Start(IIndexingEngineFactory indexingEngineFactory, TextWriter consoleOut)
+        public static void Start(TextWriter consoleOut)
         {
-            _indexingEngineFactory = indexingEngineFactory;
             IndexingEngine.Start(consoleOut);
         }
 

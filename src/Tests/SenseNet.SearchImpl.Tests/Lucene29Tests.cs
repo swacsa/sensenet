@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Lucene.Net.Index;
 using Lucene.Net.Util;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using SenseNet.Configuration;
 using SenseNet.ContentRepository;
 using SenseNet.ContentRepository.Security;
 using SenseNet.ContentRepository.Storage;
@@ -22,7 +23,7 @@ namespace SenseNet.SearchImpl.Tests
     [TestClass]
     public class Lucene29Tests : TestBase
     {
-        [TestMethod]
+        [TestMethod, Timeout(20*1000)]
         public void L29_BasicConditions()
         {
             var result =
@@ -37,7 +38,7 @@ namespace SenseNet.SearchImpl.Tests
             Assert.IsNotNull(indxDir);
         }
 
-        [TestMethod]
+        [TestMethod, Timeout(40*1000)]
         public void L29_ClearAndPopulateAll()
         {
             var sb = new StringBuilder();
@@ -60,7 +61,7 @@ namespace SenseNet.SearchImpl.Tests
                 activities = db.LoadIndexingActivities(1, activityId, 10000, false, IndexingActivityFactory.Instance);
 
                 int[] nodeIds, versionIds;
-                GetIdValues(out nodeIds, out versionIds);
+                GetAllIdValuesFromIndex(out nodeIds, out versionIds);
                 return new[]
                 {
                     activities.Length,
@@ -98,7 +99,7 @@ namespace SenseNet.SearchImpl.Tests
 
             var indxManConsole = new StringWriter();
 
-            using (new Tools.SearchEngineSwindler(new InMemorySearchEngine())) //UNDONE: change to final (Lucene29SearchEngine)
+            using (new Tools.SearchEngineSwindler(new Lucene29SearchEngine()))
             using (Tools.Swindle(typeof(StorageContext.Search), "ContentRepository", new SearchEngineSupport()))
             using (Tools.Swindle(typeof(AccessProvider), "_current", new DesktopAccessProvider()))
             using (Tools.Swindle(typeof(DataProvider), "_current", dataProvider))
@@ -107,8 +108,7 @@ namespace SenseNet.SearchImpl.Tests
                 CommonComponents.TransactionFactory = dataProvider;
                 EnsureEmptyIndexDirectory();
 
-                var factory = new DefaultIndexingEngineFactory(new Lucene29IndexingEngine(TimeSpan.FromSeconds(30)));
-                IndexManager.Start(factory, indxManConsole);
+                IndexManager.Start(indxManConsole);
 
                 try
                 {
@@ -122,7 +122,7 @@ namespace SenseNet.SearchImpl.Tests
             }
         }
 
-        private void GetIdValues(out int[] nodeIds, out int[] versionIds)
+        private void GetAllIdValuesFromIndex(out int[] nodeIds, out int[] versionIds)
         {
             var nodeIdList = new List<int>();
             var versionIdLists = new List<int>();

@@ -9,7 +9,6 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SenseNet.Search.Parser;
 using SenseNet.Search.Parser.Predicates;
 using SenseNet.Search.Tests.Implementations;
-using SnQueryToStringVisitor = SenseNet.Search.Tests.Implementations.SnQueryToStringVisitor;
 
 namespace SenseNet.Search.Tests
 {
@@ -17,7 +16,7 @@ namespace SenseNet.Search.Tests
     public class CqlParserTests
     {
         [TestMethod]
-        public void Search_Parser_AstToString_FromOriginalLuceneQueryParserSyntax()
+        public void SnQuery_Parser_AstToString_FromOriginalLuceneQueryParserSyntax()
         {
             Test("value", "_Text:value");
             Test("VALUE", "_Text:VALUE");
@@ -59,7 +58,7 @@ namespace SenseNet.Search.Tests
             Test("title:(+return +\"pink panther\")", "+title:return +title:'pink panther'");
         }
         [TestMethod]
-        public void Search_Parser_AstToString_AdditionalTests()
+        public void SnQuery_Parser_AstToString_AdditionalTests()
         {
             Test("42value", "_Text:42value");
             Test("42v?lue", "_Text:42v?lue");
@@ -68,213 +67,10 @@ namespace SenseNet.Search.Tests
             Test("Name:42a?a");
             Test("Name:42aa*");
             Test("(Name:aaa Id:2)", "Name:aaa Id:2"); // unnecessary parenthesis
-            TestError("Name:\"aaa", "Unclosed string");
+            TestError("Name:\"aaa");
         }
         [TestMethod]
-        public void Search_Parser_AstToString_AdditionalTests2()
-        {
-            Test("Name:[a TO c}");
-            Test("Name:{a TO c]");
-            Test("Index:[2 TO 3}");
-            Test("Index:{2 TO 3]");
-
-            TestError("Name:a TO c}", "Unexpected 'TO'");
-            TestError("Name:a TO c]", "Unexpected 'TO'");
-            TestError("Index:2 TO 3}", "Unexpected 'TO'");
-            TestError("Index:2 TO 3]", "Unexpected 'TO'");
-
-            TestError("Name:[a TO c", "Unterminated Range expression");
-            TestError("Name:{a TO c", "Unterminated Range expression");
-            TestError("Index:[2 TO 3", "Unterminated Range expression");
-            TestError("Index:{2 TO 3", "Unterminated Range expression");
-        }
-
-        [TestMethod]
-        public void Search_Parser_AstToString_MultiBool()
-        {
-            BoolTest("a (b c)");
-            BoolTest("a (b +c)");
-            BoolTest("a (b -c)");
-            BoolTest("a (+b c)");
-            BoolTest("a (+b +c)");
-            BoolTest("a (+b -c)");
-            BoolTest("a (-b c)");
-            BoolTest("a (-b +c)");
-            BoolTest("a (-b -c)");
-
-            BoolTest("a +(b c)");
-            BoolTest("a +(b +c)");
-            BoolTest("a +(b -c)");
-            BoolTest("a +(+b c)");
-            BoolTest("a +(+b +c)");
-            BoolTest("a +(+b -c)");
-            BoolTest("a +(-b c)");
-            BoolTest("a +(-b +c)");
-            BoolTest("a +(-b -c)");
-
-            BoolTest("a -(b c)");
-            BoolTest("a -(b +c)");
-            BoolTest("a -(b -c)");
-            BoolTest("a -(+b c)");
-            BoolTest("a -(+b +c)");
-            BoolTest("a -(+b -c)");
-            BoolTest("a -(-b c)");
-            BoolTest("a -(-b +c)");
-            BoolTest("a -(-b -c)");
-
-            BoolTest("+a (b c)");
-            BoolTest("+a (b +c)");
-            BoolTest("+a (b -c)");
-            BoolTest("+a (+b c)");
-            BoolTest("+a (+b +c)");
-            BoolTest("+a (+b -c)");
-            BoolTest("+a (-b c)");
-            BoolTest("+a (-b +c)");
-            BoolTest("+a (-b -c)");
-
-            BoolTest("+a +(b c)");
-            BoolTest("+a +(b +c)");
-            BoolTest("+a +(b -c)");
-            BoolTest("+a +(+b c)");
-            BoolTest("+a +(+b +c)");
-            BoolTest("+a +(+b -c)");
-            BoolTest("+a +(-b c)");
-            BoolTest("+a +(-b +c)");
-            BoolTest("+a +(-b -c)");
-
-            BoolTest("+a -(b c)");
-            BoolTest("+a -(b +c)");
-            BoolTest("+a -(b -c)");
-            BoolTest("+a -(+b c)");
-            BoolTest("+a -(+b +c)");
-            BoolTest("+a -(+b -c)");
-            BoolTest("+a -(-b c)");
-            BoolTest("+a -(-b +c)");
-            BoolTest("+a -(-b -c)");
-
-            BoolTest("-a (b c)");
-            BoolTest("-a (b +c)");
-            BoolTest("-a (b -c)");
-            BoolTest("-a (+b c)");
-            BoolTest("-a (+b +c)");
-            BoolTest("-a (+b -c)");
-            BoolTest("-a (-b c)");
-            BoolTest("-a (-b +c)");
-            BoolTest("-a (-b -c)");
-
-            BoolTest("-a +(b c)");
-            BoolTest("-a +(b +c)");
-            BoolTest("-a +(b -c)");
-            BoolTest("-a +(+b c)");
-            BoolTest("-a +(+b +c)");
-            BoolTest("-a +(+b -c)");
-            BoolTest("-a +(-b c)");
-            BoolTest("-a +(-b +c)");
-            BoolTest("-a +(-b -c)");
-
-            BoolTest("-a -(b c)");
-            BoolTest("-a -(b +c)");
-            BoolTest("-a -(b -c)");
-            BoolTest("-a -(+b c)");
-            BoolTest("-a -(+b +c)");
-            BoolTest("-a -(+b -c)");
-            BoolTest("-a -(-b c)");
-            BoolTest("-a -(-b +c)");
-            BoolTest("-a -(-b -c)");
-
-        }
-        [TestMethod]
-        public void Search_Parser_AstToString_MultiBool_AndOr()
-        {
-            BoolTest("a OR (b OR c)"                  , "a (b c)");
-            BoolTest("a OR (b +c)"                    , "a (b +c)"   );
-            BoolTest("a OR (b -c)"                    , "a (b -c)"   );
-            BoolTest("a OR (+b c)"                    , "a (+b c)"   );
-            BoolTest("a OR (b AND c)"                 , "a (+b +c)"  );
-            BoolTest("a OR (+b -c)"                   , "a (+b -c)"  );
-            BoolTest("a OR (-b c)"                    , "a (-b c)"   );
-            BoolTest("a OR (-b +c)"                   , "a (-b +c)"  );
-            BoolTest("a OR (NOT b OR NOT c)"          , "a (-b -c)"  );
-
-            BoolTest("a +(b OR c)"                    , "a +(b c)"   );
-            BoolTest("a +(b AND c)"                   , "a +(+b +c)" );
-            BoolTest("a +(NOT b OR NOT c)"            , "a +(-b -c)" );
-
-            BoolTest("a -(b OR c)"                    , "a -(b c)"   );
-            BoolTest("a -(b AND c)"                   , "a -(+b +c)" );
-            BoolTest("a -(NOT b OR NOT c)"            , "a -(-b -c)" );
-
-            BoolTest("+a (b OR c)"                    , "+a (b c)"   );
-            BoolTest("+a (b AND c)"                   , "+a (+b +c)" );
-            BoolTest("+a (NOT b OR NOT c)"            , "+a (-b -c)" );
-
-            BoolTest("a AND (b OR c)"                 , "+a +(b c)"  );
-            BoolTest("a AND (b +c)"                   , "+a +(b +c)" );
-            BoolTest("a AND (b -c)"                   , "+a +(b -c)" );
-            BoolTest("a AND (+b c)"                   , "+a +(+b c)" );
-            BoolTest("a AND (b AND c)"                , "+a +(+b +c)");
-            BoolTest("a AND (+b -c)"                  , "+a +(+b -c)");
-            BoolTest("a AND (-b c)"                   , "+a +(-b c)" );
-            BoolTest("a AND (-b +c)"                  , "+a +(-b +c)");
-            BoolTest("a AND (NOT b OR NOT c)"         , "+a +(-b -c)");
-
-            BoolTest("+a -(b OR c)"                   , "+a -(b c)"  );
-            BoolTest("+a -(b AND c)"                  , "+a -(+b +c)");
-            BoolTest("+a -(NOT b OR NOT c)"           , "+a -(-b -c)");
-
-            BoolTest("-a (b OR c)"                    , "-a (b c)"   );
-            BoolTest("-a (b AND c)"                   , "-a (+b +c)" );
-            BoolTest("-a (NOT b OR NOT c)"            , "-a (-b -c)" );
-
-            BoolTest("-a +(b OR c)"                   , "-a +(b c)"  );
-            BoolTest("-a +(b AND c)"                  , "-a +(+b +c)");
-            BoolTest("-a +(NOT b OR NOT c)"           , "-a +(-b -c)");
-
-            BoolTest("NOT a AND NOT (b OR c)"         , "-a -(b c)"  );
-            BoolTest("NOT a AND NOT (b +c)"           , "-a -(b +c)" );
-            BoolTest("NOT a AND NOT (b -c)"           , "-a -(b -c)" );
-            BoolTest("NOT a AND NOT (+b c)"           , "-a -(+b c)" );
-            BoolTest("NOT a AND NOT (b AND c)"        , "-a -(+b +c)");
-            BoolTest("NOT a AND NOT (+b -c)"          , "-a -(+b -c)");
-            BoolTest("NOT a AND NOT (-b c)"           , "-a -(-b c)" );
-            BoolTest("NOT a AND NOT (-b +c)"          , "-a -(-b +c)");
-            BoolTest("NOT a AND NOT (NOT b OR NOT c)" , "-a -(-b -c)");
-        }
-        [TestMethod]
-        public void Search_Parser_AstToString_MultiBool_AndOrNot()
-        {
-            BoolTest("a AND NOT b", "+a -b");
-            BoolTest("a OR NOT b", "a -b");
-            BoolTest("NOT a AND NOT b", "-a -b");
-            BoolTest("NOT a OR NOT b", "-a -b");
-        }
-
-        [TestMethod]
-        public void Search_Parser_AstToString_MultiBool_Mix()
-        {
-            BoolTest("a AND b",   "+a +b");
-            BoolTest("a AND +b",  "+a +b");
-            BoolTest("a AND -b",  "+a -b");
-            BoolTest("+a AND b",  "+a +b");
-            BoolTest("+a AND +b", "+a +b");
-            BoolTest("+a AND -b", "+a -b");
-            BoolTest("-a AND b",  "-a +b");
-            BoolTest("-a AND +b", "-a +b");
-            BoolTest("-a AND -b", "-a -b");
-
-            BoolTest("a OR b",   "a b");
-            BoolTest("a OR +b",  "a +b");
-            BoolTest("a OR -b",  "a -b");
-            BoolTest("+a OR b",  "+a b");
-            BoolTest("+a OR +b", "+a +b");
-            BoolTest("+a OR -b", "+a -b");
-            BoolTest("-a OR b",  "-a b");
-            BoolTest("-a OR +b", "-a +b");
-            BoolTest("-a OR -b", "-a -b");
-        }
-
-        [TestMethod]
-        public void Search_Parser_AstToString_EmptyQueries()
+        public void SnQuery_Parser_AstToString_EmptyQueries()
         {
             var empty = SnQuery.EmptyText;
             Test($"+(+F1:{empty} +F2:aaa*) +F3:bbb", "+(+F2:aaa*) +F3:bbb");
@@ -288,11 +84,11 @@ namespace SenseNet.Search.Tests
             Test($"F1:[\"{empty}\" TO max]", "F1:<=max");
             Test($"F1:[min TO \"{empty}\"]", "F1:>=min");
 
-            TestError($"F1:[{empty} TO {empty}]", "Invalid range");
+            TestError($"F1:[{empty} TO {empty}]");
         }
 
         [TestMethod]
-        public void Search_Parser_AstToString_PredicateTypes()
+        public void SnQuery_Parser_AstToString_PredicateTypes()
         {
             SnQuery q;
             q = Test("Name:aaa"); Assert.AreEqual(typeof(TextPredicate), q.QueryTree.GetType());
@@ -301,7 +97,7 @@ namespace SenseNet.Search.Tests
         }
 
         [TestMethod]
-        public void Search_Parser_AstToString_CqlExtension_Ranges()
+        public void SnQuery_Parser_AstToString_CqlExtension_Ranges()
         {
             SnQuery q;
             q = Test("Name:<aaa"); Assert.AreEqual(typeof(RangePredicate), q.QueryTree.GetType());
@@ -318,7 +114,7 @@ namespace SenseNet.Search.Tests
             q = Test("Value:>=3.14"); Assert.AreEqual(typeof(RangePredicate), q.QueryTree.GetType());
         }
         [TestMethod]
-        public void Search_Parser_AstToString_CqlExtension_SpecialChars()
+        public void SnQuery_Parser_AstToString_CqlExtension_SpecialChars()
         {
             Test("F1:(V1 OR V2)", "F1:V1 F1:V2");
             Test("F1:(V1 AND V2)", "+F1:V1 +F1:V2");
@@ -344,17 +140,17 @@ namespace SenseNet.Search.Tests
             Test("Aspect.Field1:aaa");
             Test("Aspect1.Field1:aaa");
 
-            TestError("42.Field1:aaa", "Unexpected ':'");
-            TestError("Name:a* |? Id:<1000", "Invalid operator: |");
-            TestError("Name:a* &? Id:<1000", "Invalid operator: &");
-            TestError("\"Name\":aaa", "Missing field name");
-            TestError("'Name':aaa", "Missing field name");
-            TestError("Name:\"aaa\\", "Unclosed string");
-            TestError("Name:\"aaa\\\"", "Unclosed string");
-            TestError("Name:<>:", "Unexpected Colon");
+            TestError("42.Field1:aaa");
+            TestError("Name:a* |? Id:<1000");
+            TestError("Name:a* &? Id:<1000");
+            TestError("\"Name\":aaa");
+            TestError("'Name':aaa");
+            TestError("Name:\"aaa\\");
+            TestError("Name:\"aaa\\\"");
+            TestError("Name:<>:");
         }
         [TestMethod]
-        public void Search_Parser_AstToString_CqlExtension_Comments()
+        public void SnQuery_Parser_AstToString_CqlExtension_Comments()
         {
             Test("F1:V1 //asdf", "F1:V1");
             Test("+F1:V1 /*asdf*/ +F2:V2 /*qwer*/", "+F1:V1 +F2:V2");
@@ -366,7 +162,7 @@ namespace SenseNet.Search.Tests
             Test("Name:aaa /*unterminatedblockcomment", "Name:aaa");
         }
         [TestMethod]
-        public void Search_Parser_AstToString_CqlExtension_Controls()
+        public void SnQuery_Parser_AstToString_CqlExtension_Controls()
         {
             // ".SELECT";
             // ".SKIP";
@@ -388,96 +184,66 @@ namespace SenseNet.Search.Tests
             Assert.AreEqual(null, q.Projection);
             Assert.AreEqual(0, q.Sort.Length);
 
-            q = Test("F1:V1 .TOP:42", "F1:V1");
-            Assert.AreEqual(42, q.Top);
-            q = Test("F1:V1 .SKIP:42", "F1:V1");
-            Assert.AreEqual(42, q.Skip);
-            q = Test("F1:V1 .COUNTONLY", "F1:V1");
-            Assert.AreEqual(true, q.CountOnly);
-            q = Test("F1:V1 .AUTOFILTERS:ON", "F1:V1");
-            Assert.AreEqual(FilterStatus.Enabled, q.EnableAutofilters);
-            q = Test("F1:V1 .AUTOFILTERS:OFF", "F1:V1");
-            Assert.AreEqual(FilterStatus.Disabled, q.EnableAutofilters);
-            q = Test("F1:V1 .LIFESPAN:ON", "F1:V1");
-            Assert.AreEqual(FilterStatus.Enabled, q.EnableLifespanFilter);
-            q = Test("F1:V1 .LIFESPAN:OFF", "F1:V1");
-            Assert.AreEqual(FilterStatus.Disabled, q.EnableLifespanFilter);
-            q = Test("F1:V1 .QUICK", "F1:V1");
-            Assert.AreEqual(QueryExecutionMode.Quick, q.QueryExecutionMode);
-            q = Test("F1:V1 .SELECT:Name", "F1:V1");
-            Assert.AreEqual("Name", q.Projection);
+            q = Test("F1:V1 .TOP:42", "F1:V1"); Assert.AreEqual(42, q.Top);
+            q = Test("F1:V1 .SKIP:42", "F1:V1"); Assert.AreEqual(42, q.Skip);
+            q = Test("F1:V1 .COUNTONLY", "F1:V1"); Assert.AreEqual(true, q.CountOnly);
+            q = Test("F1:V1 .AUTOFILTERS:ON", "F1:V1"); Assert.AreEqual(FilterStatus.Enabled, q.EnableAutofilters);
+            q = Test("F1:V1 .AUTOFILTERS:OFF", "F1:V1"); Assert.AreEqual(FilterStatus.Disabled, q.EnableAutofilters);
+            q = Test("F1:V1 .LIFESPAN:ON", "F1:V1"); Assert.AreEqual(FilterStatus.Enabled, q.EnableLifespanFilter);
+            q = Test("F1:V1 .LIFESPAN:OFF", "F1:V1"); Assert.AreEqual(FilterStatus.Disabled, q.EnableLifespanFilter);
+            q = Test("F1:V1 .QUICK", "F1:V1"); Assert.AreEqual(QueryExecutionMode.Quick, q.QueryExecutionMode);
+            q = Test("F1:V1 .SELECT:Name", "F1:V1"); Assert.AreEqual("Name", q.Projection);
 
-            q = Test("F1:V1 .SORT:F1", "F1:V1");
-            Assert.AreEqual("F1 ASC", SortToString(q.Sort));
-            q = Test("F1:V1 .REVERSESORT:F1", "F1:V1");
-            Assert.AreEqual("F1 DESC", SortToString(q.Sort));
-            q = Test("F1:V1 .SORT:F1 .SORT:F2", "F1:V1");
-            Assert.AreEqual("F1 ASC, F2 ASC", SortToString(q.Sort));
-            q = Test("F1:V1 .SORT:F1 .REVERSESORT:F3 .SORT:F2", "F1:V1");
-            Assert.AreEqual("F1 ASC, F3 DESC, F2 ASC", SortToString(q.Sort));
+            q = Test("F1:V1 .SORT:F1", "F1:V1"); Assert.AreEqual("F1 ASC", SortToString(q.Sort));
+            q = Test("F1:V1 .REVERSESORT:F1", "F1:V1"); Assert.AreEqual("F1 DESC", SortToString(q.Sort));
+            q = Test("F1:V1 .SORT:F1 .SORT:F2", "F1:V1"); Assert.AreEqual("F1 ASC, F2 ASC", SortToString(q.Sort));
+            q = Test("F1:V1 .SORT:F1 .REVERSESORT:F3 .SORT:F2", "F1:V1"); Assert.AreEqual("F1 ASC, F3 DESC, F2 ASC", SortToString(q.Sort));
 
-            TestError("F1:V1 .UNKNOWNKEYWORD", "Unknown control keyword");
-            TestError("F1:V1 .TOP", "Expected: Colon (':')");
-            TestError("F1:V1 .TOP:", "Expected: Number");
-            TestError("F1:V1 .TOP:aaa", "Expected: Number");
-            TestError("F1:V1 .SKIP", "Expected: Colon (':')");
-            TestError("F1:V1 .SKIP:", "Expected: Number");
-            TestError("F1:V1 .SKIP:aaa", "Expected: Number");
-            TestError("F1:V1 .COUNTONLY:", "Unexpected ':'");
-            TestError("F1:V1 .COUNTONLY:aaa", "Unexpected ':'");
-            TestError("F1:V1 .COUNTONLY:42", "Unexpected ':'");
-            TestError("F1:V1 .COUNTONLY:ON", "Unexpected ':'");
-            TestError("F1:V1 .AUTOFILTERS", "Expected: Colon (':')");
-            TestError("F1:V1 .AUTOFILTERS:", "Expected: 'ON' or 'OFF'");
-            TestError("F1:V1 .AUTOFILTERS:42", "Expected: 'ON' or 'OFF'");
-            TestError("F1:V1 .LIFESPAN", "Expected: Colon (':')");
-            TestError("F1:V1 .LIFESPAN:", "Expected: 'ON' or 'OFF'");
-            TestError("F1:V1 .LIFESPAN:42", "Expected: 'ON' or 'OFF'");
-            TestError("F1:V1 .QUICK:", "Unexpected ':'");
-            TestError("F1:V1 .QUICK:aaa", "Unexpected ':'");
-            TestError("F1:V1 .QUICK:42", "Unexpected ':'");
-            TestError("F1:V1 .QUICK:ON", "Unexpected ':'");
-            TestError("F1:V1 .SORT", "Expected: Colon (':')");
-            TestError("F1:V1 .SORT:", "Expected: String");
-            TestError("F1:V1 .SORT:42", "Expected: String");
-            TestError("F1:V1 .SELECT", "Expected: Colon (':')");
-            TestError("F1:V1 .SELECT:", "Expected: String");
-            TestError("F1:V1 .SELECT:123", "Expected: String");
+            TestError("F1:V1 .UNKNOWNKEYWORD");
+            TestError("F1:V1 .TOP");
+            TestError("F1:V1 .TOP:");
+            TestError("F1:V1 .TOP:aaa");
+            TestError("F1:V1 .SKIP");
+            TestError("F1:V1 .SKIP:");
+            TestError("F1:V1 .SKIP:aaa");
+            TestError("F1:V1 .COUNTONLY:");
+            TestError("F1:V1 .COUNTONLY:aaa");
+            TestError("F1:V1 .COUNTONLY:42");
+            TestError("F1:V1 .COUNTONLY:ON");
+            TestError("F1:V1 .AUTOFILTERS");
+            TestError("F1:V1 .AUTOFILTERS:");
+            TestError("F1:V1 .AUTOFILTERS:42");
+            TestError("F1:V1 .LIFESPAN");
+            TestError("F1:V1 .LIFESPAN:");
+            TestError("F1:V1 .LIFESPAN:42");
+            TestError("F1:V1 .QUICK:");
+            TestError("F1:V1 .QUICK:aaa");
+            TestError("F1:V1 .QUICK:42");
+            TestError("F1:V1 .QUICK:ON");
+            TestError("F1:V1 .SORT");
+            TestError("F1:V1 .SORT:");
+            TestError("F1:V1 .SORT:42");
+            TestError("F1:V1 .SELECT");
+            TestError("F1:V1 .SELECT:");
+            TestError("F1:V1 .SELECT:123");
         }
-
         [TestMethod]
-        public void Search_Parser_AstToString_CqlErrors()
+        public void SnQuery_Parser_AstToString_CqlErrors()
         {
-            TestError("", "Empty query is not allowed.");
-            TestError("()", "Empty query is not allowed.");
-            TestError("+(+(Id:1 Id:2) +Name:<b", "Missing ')'");
-            TestError("Id:(1 2 3", "Expected: ')'");
-            TestError("Password:asdf", "Cannot search by 'Password' field");
-            TestError("PasswordHash:asdf", "Cannot search by 'PasswordHash' field");
-            TestError("Id::1", "Unexpected ':'");
-            TestError("Id:[10 to 15]", "Syntax error");
-            TestError("Id:[10 TO 15", "Unterminated Range expression");
-            TestError("Id:[ TO ]", "Invalid range");
-            TestError("_Text:\"aaa bbb\"~", "Missing proximity value");
-            TestError("Name:aaa~1.5", "Invalid fuzzy value");
-            TestError("Name:aaa^x", "Syntax error");
+            TestError("");
+            TestError("()");
+            TestError("+(+(Id:1 Id:2) +Name:<b");
+            TestError("Id:(1 2 3");
+            TestError("Password:asdf");
+            TestError("PasswordHash:asdf");
+            TestError("Id::1");
+            TestError("Id:[10 to 15]");
+            TestError("Id:[10 TO 15");
+            TestError("Id:[ TO ]");
+            TestError("_Text:\"aaa bbb\"~");
+            TestError("Name:aaa~1.5");
+            TestError("Name:aaa^x");
             //UNDONE: Nullref exception in this test: Test("Name:()");
-        }
-
-        /* ============================================================================= */
-        private SnQuery BoolTest(string queryText, string expected = null)
-        {
-            return Test(TransformToTerms(queryText), TransformToTerms(expected));
-        }
-        private string TransformToTerms(string text)
-        {
-            if (text == null)
-                return null;
-
-            for (var c = 'a'; c < 'e'; c++)
-                text = text.Replace(c.ToString(), $"F{c}:{c}");
-
-            return text;
         }
 
         private SnQuery Test(string queryText, string expected = null)
@@ -494,8 +260,7 @@ namespace SenseNet.Search.Tests
             Assert.AreEqual(expected ?? queryText, actualResult);
             return snQuery;
         }
-
-        private void TestError(string queryText, string expectedMessageSubstring)
+        private void TestError(string queryText)
         {
             var queryContext = new TestQueryContext(QuerySettings.Default, 0, null);
             var parser = new CqlParser();
@@ -510,8 +275,6 @@ namespace SenseNet.Search.Tests
             }
             if (thrownException == null)
                 Assert.Fail("Any exception wasn't thrown");
-            if (expectedMessageSubstring != null && !thrownException.Message.Contains(expectedMessageSubstring))
-                Assert.Fail($"Error message does not contain '{expectedMessageSubstring}'. Actual message: <{thrownException.Message}>");
         }
 
         private string SortToString(SortInfo[] sortInfo)
@@ -520,7 +283,7 @@ namespace SenseNet.Search.Tests
         }
 
         [TestMethod]
-        public void Search_Parser_AggregateSettingsTest()
+        public void SnQuery_Parser_AggregateSettingsTest()
         {
             var indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>
             {
@@ -604,7 +367,7 @@ namespace SenseNet.Search.Tests
 
         //UNDONE: Move this test to QueryClassifier tests
         //[TestMethod]
-        //public void Search_Parser_UsedFieldNames()
+        //public void SnQuery_Parser_UsedFieldNames()
         //{
         //    var indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>
         //    {

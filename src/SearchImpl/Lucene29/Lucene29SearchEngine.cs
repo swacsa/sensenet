@@ -13,6 +13,11 @@ namespace SenseNet.Search.Lucene29
     {
         public static readonly Lucene.Net.Util.Version LuceneVersion = Lucene.Net.Util.Version.LUCENE_29;
 
+        readonly Lucene29QueryEngine _queryEngineInstance = new Lucene29QueryEngine();
+
+        public IIndexingEngine IndexingEngine { get; } = new Lucene29IndexingEngine();
+
+        public IQueryEngine QueryEngine { get; } = new Lucene29QueryEngine();
 
         static Lucene29SearchEngine()
         {
@@ -62,16 +67,6 @@ namespace SenseNet.Search.Lucene29
                 }
                 _analyzers = analyzerTypes;
             }
-        }
-
-        public IIndexingEngine GetIndexingEngine()
-        {
-            return new Lucene29IndexingEngine();
-        }
-
-        public IQueryEngine GetQueryEngine()
-        {
-            return new Lucene29QueryEngine();
         }
     }
 }

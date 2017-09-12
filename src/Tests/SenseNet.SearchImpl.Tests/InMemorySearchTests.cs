@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.Remoting.Messaging;
 using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SenseNet.Configuration;
@@ -15,14 +16,15 @@ using SenseNet.Search;
 using SenseNet.Search.Indexing;
 using SenseNet.Search.Lucene29;
 using SenseNet.SearchImpl.Tests.Implementations;
+using SafeQueries = SenseNet.SearchImpl.Tests.Implementations.SafeQueries;
 
 namespace SenseNet.SearchImpl.Tests
 {
     [TestClass]
-    public class IndexingTests : TestBase
+    public class InMemorySearchTests : TestBase
     {
         [TestMethod]
-        public void Indexing_Create()
+        public void InMemSearch_Indexing_Create()
         {
             Node node;
             var result = Test(() =>
@@ -94,7 +96,7 @@ namespace SenseNet.SearchImpl.Tests
         }
 
         [TestMethod]
-        public void Indexing_Update()
+        public void InMemSearch_Indexing_Update()
         {
             Node node;
             var result = Test(() =>
@@ -180,7 +182,7 @@ namespace SenseNet.SearchImpl.Tests
         }
 
         [TestMethod]
-        public void Indexing_Delete()
+        public void InMemSearch_Indexing_Delete()
         {
             Node node1, node2;
 
@@ -271,7 +273,7 @@ namespace SenseNet.SearchImpl.Tests
         }
 
         [TestMethod]
-        public void Indexing_Rename()
+        public void InMemSearch_Indexing_Rename()
         {
             Node node1; // /Root/Node1
             Node node2; // /Root/Node1/Node2
@@ -405,7 +407,7 @@ namespace SenseNet.SearchImpl.Tests
 
 
         [TestMethod]
-        public void Indexing_AddTextEctract()
+        public void InMemSearch_Indexing_AddTextEctract()
         {
             Node node;
             var additionalText = "additionaltext";
@@ -465,7 +467,7 @@ namespace SenseNet.SearchImpl.Tests
         }
 
         [TestMethod]
-        public void Indexing_ClearAndPopulateAll()
+        public void InMemSearch_Indexing_ClearAndPopulateAll()
         {
             var sb = new StringBuilder();
             IIndexingActivity[] activities;
@@ -509,11 +511,363 @@ namespace SenseNet.SearchImpl.Tests
 
         /* ============================================================================ */
 
+        [TestMethod]
+        public void InMemSearch_Query_1Term1Hit()
+        {
+            Node node;
+            var result = Test(() =>
+            {
+                // create a test node under the root.
+                node = new SystemFolder(Node.LoadNode(Identifiers.PortalRootId))
+                {
+                    Name = "Node1",
+                    DisplayName = "Node 1",
+                    Index = 42
+                };
+                foreach (var observer in NodeObserver.GetObserverTypes())
+                    node.DisableObserver(observer);
+                node.Save();
+
+                // ACTION
+                var qresult = ContentQuery_NEW.Query(SafeQueries.Name, QuerySettings.AdminSettings, "Node1");
+
+                return new Tuple<int[], Node[]>(qresult.Identifiers.ToArray(), qresult.Nodes.ToArray());
+            });
+
+            var nodeIds = result.Item1;
+            var nodes = result.Item2;
+
+        }
+
+        [TestMethod]
+        public void InMemSearch_Query_1TermMoreHit1Order()
+        {
+            var createNode = new Func<Node, string, int, Node>((parent, name, index) =>
+            {
+                var node = new SystemFolder(parent) {Name = name, Index = index};
+                foreach (var observer in NodeObserver.GetObserverTypes())
+                    node.DisableObserver(observer);
+                node.Save();
+                return node;
+            });
+
+            Node root, f1, f2, f3, node1, node2, node3;
+            node1 = node2 = node3 = null;
+
+            var result = Test(() =>
+            {
+                // create a test structure:
+                //    Root
+                //      F1
+                //        Node1 (Index=42)
+                //      F2
+                //        Node1 (Index=41)
+                //      F3
+                //        Node1 (Index=43)
+                root = Node.LoadNode(Identifiers.PortalRootId);
+
+                f1 = createNode(root, "F1", 0);
+                node1 = createNode(f1, "Node1", 42);
+                f2 = createNode(root, "F2", 0);
+                node2 = createNode(f2, "Node1", 41);
+                f3 = createNode(root, "F3", 0);
+                node3 = createNode(f3, "Node1", 43);
+
+                // ACTION
+                var settings = QuerySettings.AdminSettings;
+                settings.Sort = new[] { new SortInfo(IndexFieldName.Index) };
+                var qresult = ContentQuery_NEW.Query(SafeQueries.Name, settings, "Node1");
+
+                return new Tuple<int[], Node[]>(qresult.Identifiers.ToArray(), qresult.Nodes.ToArray());
+            });
+
+            var nodeIds = result.Item1;
+            var nodes = result.Item2;
+
+            var expectedNodeIds = $"{node2.Id}, {node1.Id}, {node3.Id}";
+            var actualNodeIds = string.Join(", ", nodeIds);
+            Assert.AreEqual(expectedNodeIds, actualNodeIds);
+
+            var expectedPaths = $"/Root/F2/Node1, /Root/F1/Node1, /Root/F3/Node1";
+            var actualPaths = string.Join(", ", nodes.Select(n => n.Path));
+            Assert.AreEqual(expectedPaths, actualPaths);
+        }
+
+        [TestMethod]
+        public void InMemSearch_Query_1TermMoreHit2Order()
+        {
+            var createNode = new Func<Node, string, string, int, Node>((parent, name, displayName, index) =>
+            {
+                var node = new SystemFolder(parent) { Name = name, DisplayName = displayName, Index = index };
+                foreach (var observer in NodeObserver.GetObserverTypes())
+                    node.DisableObserver(observer);
+                node.Save();
+                return node;
+            });
+
+            var result = Test(() =>
+            {
+                // create a test structure:
+                var root = Node.LoadNode(Identifiers.PortalRootId);
+                var f1 = createNode(root, "F1", "F1", 0);
+                createNode(f1, "N1", "D2", 2);
+                createNode(f1, "N2", "D3", 2);
+                createNode(f1, "N3", "D2", 3);
+                createNode(f1, "N4", "D3", 3);
+                createNode(f1, "N5", "D1", 2);
+                createNode(f1, "N6", "D3", 1);
+                createNode(f1, "N7", "D2", 1);
+                createNode(f1, "N8", "D1", 1);
+
+                // ACTION
+                var settings = QuerySettings.AdminSettings;
+                settings.Sort = new[] {new SortInfo(IndexFieldName.DisplayName), new SortInfo(IndexFieldName.Index, true) };
+                var qresult = ContentQuery_NEW.Query(SafeQueries.OneTerm, settings, "ParentId", f1.Id.ToString());
+
+                return new Tuple<int[], Node[]>(qresult.Identifiers.ToArray(), qresult.Nodes.ToArray());
+            });
+
+            var nodeIds = result.Item1;
+            var nodes = result.Item2;
+
+            var expectedNames = "N5, N8, N3, N1, N7, N4, N2, N6";
+            var actualNames = string.Join(", ", nodes.Select(n => n.Name));
+            Assert.AreEqual(expectedNames, actualNames);
+        }
+
+        [TestMethod]
+        public void InMemSearch_Query_PrefixOrSuffix()
+        {
+            var createNode = new Func<Node, string, Node>((parent, name) =>
+            {
+                var node = new SystemFolder(parent) { Name = name };
+                foreach (var observer in NodeObserver.GetObserverTypes())
+                    node.DisableObserver(observer);
+                node.Save();
+                return node;
+            });
+
+            var result = Test(() =>
+            {
+                // create a test structure:
+                var root = Node.LoadNode(Identifiers.PortalRootId);
+                var f1 = createNode(root, "F1");
+                createNode(f1, "A1");
+                createNode(f1, "B1");
+                createNode(f1, "C1");
+                createNode(f1, "A2");
+                createNode(f1, "B2");
+                createNode(f1, "C2");
+                createNode(f1, "A3");
+                createNode(f1, "B3");
+                createNode(f1, "C3");
+
+                // ACTION
+                var settings = QuerySettings.AdminSettings;
+                settings.Sort = new[] { new SortInfo(IndexFieldName.Name) };
+                var qresult1 = ContentQuery_NEW.Query(SafeQueries.OneTerm, settings, "Name", "B*");
+                var qresult2 = ContentQuery_NEW.Query(SafeQueries.OneTerm, settings, "Name", "*3");
+
+                return new Tuple<Node[], Node[]>(qresult1.Nodes.ToArray(), qresult2.Nodes.ToArray());
+            });
+
+            var nodes1 = result.Item1;
+            var nodes2 = result.Item2;
+
+            Assert.AreEqual("B1, B2, B3", string.Join(", ", nodes1.Select(n => n.Name)));
+            Assert.AreEqual("A3, B3, C3", string.Join(", ", nodes2.Select(n => n.Name)));
+        }
+
+        [TestMethod]
+        public void InMemSearch_Query_PrefixAndSuffixOrMiddle()
+        {
+            var createNode = new Func<Node, string, Node>((parent, name) =>
+            {
+                var node = new SystemFolder(parent) { Name = name };
+                foreach (var observer in NodeObserver.GetObserverTypes())
+                    node.DisableObserver(observer);
+                node.Save();
+                return node;
+            });
+
+            var result = Test(() =>
+            {
+                // create a test structure:
+                var root = Node.LoadNode(Identifiers.PortalRootId);
+                var f1 = createNode(root, "F1");
+                createNode(f1, "Ax1");
+                createNode(f1, "Ax2");
+                createNode(f1, "Ay1");
+                createNode(f1, "Ay2");
+                createNode(f1, "Bx1");
+                createNode(f1, "Bx2");
+                createNode(f1, "By1");
+                createNode(f1, "By2");
+
+                // ACTION
+                var settings = QuerySettings.AdminSettings;
+                settings.Sort = new[] { new SortInfo(IndexFieldName.Name) };
+                var qresult1 = ContentQuery_NEW.Query(SafeQueries.OneTerm, settings, "Name", "A*2");
+                var qresult2 = ContentQuery_NEW.Query(SafeQueries.OneTerm, settings, "Name", "*y*");
+
+                return new Tuple<Node[], Node[]>(qresult1.Nodes.ToArray(), qresult2.Nodes.ToArray());
+            });
+
+            var nodes1 = result.Item1;
+            var nodes2 = result.Item2;
+
+            Assert.AreEqual("Ax2, Ay2", string.Join(", ", nodes1.Select(n => n.Name)));
+            Assert.AreEqual("Ay1, Ay2, By1, By2", string.Join(", ", nodes2.Select(n => n.Name)));
+        }
+
+
+        [TestMethod]
+        public void InMemSearch_Query_Range()
+        {
+            var createNode = new Func<Node, string, Node>((parent, name) =>
+            {
+                var node = new SystemFolder(parent) { Name = name };
+                foreach (var observer in NodeObserver.GetObserverTypes())
+                    node.DisableObserver(observer);
+                node.Save();
+                return node;
+            });
+
+            var result = Test(() =>
+            {
+                // create a test structure:
+                var root = Node.LoadNode(Identifiers.PortalRootId);
+                createNode(root, "N0");
+                createNode(root, "N1");
+                createNode(root, "N2");
+                createNode(root, "N3");
+                createNode(root, "N4");
+                createNode(root, "N5");
+                createNode(root, "N6");
+                createNode(root, "N7");
+                createNode(root, "N8");
+                createNode(root, "N9");
+
+                // ACTION
+                var settings = QuerySettings.AdminSettings;
+                settings.Sort = new[] { new SortInfo(IndexFieldName.Name) };
+                string[] results = new[]
+                {
+                    string.Join(", ", ContentQuery_NEW.Query(SafeQueries.GT, settings, "Name", "N4").Nodes.Select(n => n.Name).ToArray()),
+                    string.Join(", ", ContentQuery_NEW.Query(SafeQueries.GTE, settings, "Name", "N4").Nodes.Select(n => n.Name).ToArray()),
+                    string.Join(", ", ContentQuery_NEW.Query(SafeQueries.LT, settings, "Name", "N4").Nodes.Select(n => n.Name).ToArray()),
+                    string.Join(", ", ContentQuery_NEW.Query(SafeQueries.LTE, settings, "Name", "N4").Nodes.Select(n => n.Name).ToArray()),
+                    string.Join(", ", ContentQuery_NEW.Query(SafeQueries.BracketBracketRange, settings, "Name", "N2", "N7").Nodes.Select(n => n.Name).ToArray()),
+                    string.Join(", ", ContentQuery_NEW.Query(SafeQueries.BracketBraceRange, settings, "Name", "N2", "N7").Nodes.Select(n => n.Name).ToArray()),
+                    string.Join(", ", ContentQuery_NEW.Query(SafeQueries.BraceBracketRange, settings, "Name", "N2", "N7").Nodes.Select(n => n.Name).ToArray()),
+                    string.Join(", ", ContentQuery_NEW.Query(SafeQueries.BraceBraceRange, settings, "Name", "N2", "N7").Nodes.Select(n => n.Name).ToArray()),
+                };
+
+                return results;
+            });
+
+            Assert.AreEqual("N5, N6, N7, N8, N9",     result[0]);
+            Assert.AreEqual("N4, N5, N6, N7, N8, N9", result[1]);
+            Assert.AreEqual("N0, N1, N2, N3",         result[2]);
+            Assert.AreEqual("N0, N1, N2, N3, N4",     result[3]);
+            Assert.AreEqual("N2, N3, N4, N5, N6, N7", result[4]);
+            Assert.AreEqual("N2, N3, N4, N5, N6",     result[5]);
+            Assert.AreEqual(    "N3, N4, N5, N6, N7", result[6]);
+            Assert.AreEqual(    "N3, N4, N5, N6",     result[7]);
+        }
+
+
+        [TestMethod]
+        public void InMemSearch_Query_2TermsBool()
+        {
+            var createNode = new Func<Node, string, int, Node>((parent, name, index) =>
+            {
+                var node = new SystemFolder(parent) { Name = name, Index = index };
+                foreach (var observer in NodeObserver.GetObserverTypes())
+                    node.DisableObserver(observer);
+                node.Save();
+                return node;
+            });
+
+            var result = Test(() =>
+            {
+                // create a test structure:
+                var root = Node.LoadNode(Identifiers.PortalRootId);
+                createNode(root, "A0", 0);
+                createNode(root, "A1", 1);
+                createNode(root, "A2", 2);
+                createNode(root, "A3", 3);
+                createNode(root, "B0", 0);
+                createNode(root, "B1", 1);
+                createNode(root, "B2", 2);
+                createNode(root, "B3", 3);
+
+                // ACTION
+                var settings = QuerySettings.AdminSettings;
+                settings.Sort = new[] { new SortInfo(IndexFieldName.Name) };
+                string[] results = new[]
+                {
+                    string.Join(", ", ContentQuery_NEW.Query(SafeQueries.TwoTermsShouldShould, settings, "Name", "A*", "Index", 1).Nodes.Select(n => n.Name).ToArray()),
+                    string.Join(", ", ContentQuery_NEW.Query(SafeQueries.TwoTermsMustMust, settings, "Name", "A*", "Index", 1).Nodes.Select(n => n.Name).ToArray()),
+                    string.Join(", ", ContentQuery_NEW.Query(SafeQueries.TwoTermsMustNot, settings, "Name", "A*", "Index", 1).Nodes.Select(n => n.Name).ToArray()),
+                };
+
+                return results;
+            });
+
+            Assert.AreEqual("A0, A1, A2, A3, B1", result[0]);
+            Assert.AreEqual("A1", result[1]);
+            Assert.AreEqual("A0, A2, A3", result[2]);
+        }
+
+        [TestMethod]
+        public void InMemSearch_Query_MultiLevelBool()
+        {
+            var createNode = new Func<Node, string, int, Node>((parent, name, index) =>
+            {
+                var node = new SystemFolder(parent) { Name = name, Index = index };
+                foreach (var observer in NodeObserver.GetObserverTypes())
+                    node.DisableObserver(observer);
+                node.Save();
+                return node;
+            });
+
+            var result = Test(() =>
+            {
+                // create a test structure:
+                var root = Node.LoadNode(Identifiers.PortalRootId);
+                createNode(root, "A0", 0);
+                createNode(root, "A1", 1);
+                createNode(root, "A2", 2);
+                createNode(root, "A3", 3);
+                createNode(root, "B0", 0);
+                createNode(root, "B1", 1);
+                createNode(root, "B2", 2);
+                createNode(root, "B3", 3);
+
+                // ACTION
+                var settings = QuerySettings.AdminSettings;
+                settings.Sort = new[] { new SortInfo(IndexFieldName.Name) };
+                string[] results = new[]
+                {
+                    //  (+Name:A* +Index:1) (+Name:B* +Index:2) --> A1, B2
+                    string.Join(", ", ContentQuery_NEW.Query(SafeQueries.MultiLevelBool1, settings, "Name", "A*", "Index", 1, "Name", "B*", "Index", 2).Nodes.Select(n => n.Name).ToArray()),
+                    //  +(Name:A* Index:1) +(Name:B* Index:2) --> +(A0, A1, A2, A3, B1) +(B0, B1, B2, B3, A2) --> A2, B1
+                    string.Join(", ", ContentQuery_NEW.Query(SafeQueries.MultiLevelBool2, settings, "Name", "A*", "Index", 1, "Name", "B*", "Index", 2).Nodes.Select(n => n.Name).ToArray()),
+                };
+
+                return results;
+            });
+
+            Assert.AreEqual("A1, B2", result[0]);
+            Assert.AreEqual("A2, B1", result[1]);
+        }
+
+        /* ============================================================================ */
+
         private InMemoryIndex GetTestIndex()
         {
-            var indexManagerAcc = new PrivateType(typeof(IndexManager));
-            var factory = (InMemoryIndexingEngineFactory) indexManagerAcc.GetStaticField("_indexingEngineFactory");
-            return factory.Instance.Index;
+            return ((InMemoryIndexingEngine) IndexManager.IndexingEngine).Index;
         }
 
         private void SaveNode(Node node)

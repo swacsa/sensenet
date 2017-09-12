@@ -9,12 +9,19 @@ namespace SenseNet.SearchImpl.Tests.Implementations
 {
     internal class InMemorySearchEngine : ISearchEngine
     {
+        private IDictionary<string, Type> _analyzers = new Dictionary<string, Type>();
+        private readonly InMemoryIndexingEngine _indexingEngine;
+        private readonly InMemoryQueryEngine _queryEngine;
+
+        public IIndexingEngine IndexingEngine => _indexingEngine;
+
+        public IQueryEngine QueryEngine => _queryEngine;
+
         public IIndexPopulator GetPopulator()
         {
             return new DocumentPopulator();
         }
 
-        private IDictionary<string, Type> _analyzers = new Dictionary<string, Type>();
         public IDictionary<string, Type> GetAnalyzers()
         {
             return _analyzers;
@@ -40,14 +47,11 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             }
         }
 
-        public IIndexingEngine GetIndexingEngine() //UNDONE: not tested
-        {
-            return new InMemoryIndexingEngine();
-        }
 
-        public IQueryEngine GetQueryEngine()
+        public InMemorySearchEngine()
         {
-            throw new NotImplementedException();
+            _indexingEngine = new InMemoryIndexingEngine();
+            _queryEngine = new InMemoryQueryEngine(_indexingEngine.Index);
         }
     }
 }
