@@ -74,7 +74,7 @@ namespace SenseNet.SearchImpl.Tests.Implementations
             int totalCount;
             var result = interpreter.Execute(query, filter, out totalCount);
 
-            var projectedValues = result.Select(h => h.ValueForProject).ToArray();
+            var projectedValues = result.Select(h => h.ValueForProject).Distinct().ToArray();
             var queryResult = new QueryResult<string>(projectedValues, totalCount);
             return queryResult;
         }
@@ -152,6 +152,9 @@ namespace SenseNet.SearchImpl.Tests.Implementations
 
             private string GetFieldValueAsString(IndexField field)
             {
+                if (field == null)
+                    return null;
+
                 switch (field.Type)
                 {
                     case SnTermType.String:
@@ -159,7 +162,7 @@ namespace SenseNet.SearchImpl.Tests.Implementations
                     case SnTermType.StringArray:
                         throw new NotImplementedException();
                     case SnTermType.Bool:
-                        return field.BooleanValue ? StorageContext.Search.Yes : StorageContext.Search.No;
+                        return field.BooleanValue ? SnTerm.Yes : SnTerm.No;
                     case SnTermType.Int:
                         return field.IntegerValue.ToString(CultureInfo.InvariantCulture);
                     case SnTermType.Long:

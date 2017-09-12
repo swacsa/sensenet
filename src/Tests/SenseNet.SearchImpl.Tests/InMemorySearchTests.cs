@@ -11,6 +11,7 @@ using SenseNet.ContentRepository.Security;
 using SenseNet.ContentRepository.Storage;
 using SenseNet.ContentRepository.Storage.Data;
 using SenseNet.ContentRepository.Storage.Events;
+using SenseNet.ContentRepository.Storage.Search;
 using SenseNet.ContentRepository.Storage.Security;
 using SenseNet.Search;
 using SenseNet.Search.Indexing;
@@ -863,6 +864,99 @@ namespace SenseNet.SearchImpl.Tests
             Assert.AreEqual("A2, B1", result[1]);
         }
 
+
+        [TestMethod]
+        public void InMemSearch_Query_Recursive()
+        {
+            var createNode = new Func<Node, string, Node>((parent, name) =>
+            {
+                var node = new SystemFolder(parent) { Name = name };
+                foreach (var observer in NodeObserver.GetObserverTypes())
+                    node.DisableObserver(observer);
+                node.Save();
+                return node;
+            });
+
+            var result = Test(() =>
+            {
+                SaveInitialIndexDocuments();
+                StorageContext.Search.SearchEngine.GetPopulator().ClearAndPopulateAll();
+
+                // create a test structure:
+                var root = Node.LoadNode(Identifiers.PortalRootId);
+                var folder0 = createNode(root, "Folder0");
+                createNode(folder0, "A0");
+                createNode(folder0, "A1");
+                createNode(folder0, "A2");
+                var folder1 = createNode(root, "Folder1");
+                createNode(folder1, "B0");
+                createNode(folder1, "B1");
+                createNode(folder1, "B2");
+                var folder2 = createNode(root, "Folder2");
+                createNode(folder2, "A0");
+                createNode(folder2, "A1");
+                createNode(folder2, "A2");
+
+                // ACTION
+                var settings = QuerySettings.AdminSettings;
+                settings.Sort = new[] { new SortInfo(IndexFieldName.Name) };
+
+                string queryResult = string.Join(", ",
+                    ContentQuery_NEW.Query(SafeQueries.Recursive, settings, "Name", "A*",
+                        "Index", 2).Nodes.Select(n => n.Name).ToArray());
+
+                return queryResult;
+            });
+
+            Assert.AreEqual("Admin", result);
+        }
+
+        [TestMethod]
+        public void InMemSearch_Query_Recursive_1()
+        {
+            var mock = new Dictionary<string, string[]>
+            {
+                {"Name:'MyDocument.doc' .SELECT:OwnerId", new [] {"1", "3", "7"}}
+            };
+            var log = new List<string>();
+            QueryResult result;
+
+            DistributedApplication.Cache.Reset();
+            var repoBuilder = new RepoBuilder();
+            using (RepositoryStart(repoBuilder
+                .UseDataProvider(new InMemoryDataProvider())
+                .UseTransactionFactory(repoBuilder.DataProvider)
+                .UseSearchEngine(new SearchEngineForNestedQueryTests(mock, log))
+                .UseSearchEngineSupport(new SearchEngineSupport())
+                .UseAccessProvider(new DesktopAccessProvider())
+                .InitializeTypeHandler(new Dictionary<Type, Type[]>
+                {
+                    {typeof(ElevatedModificationVisibilityRule), new[] {typeof(SnElevatedModificationVisibilityRule)}}
+                })
+                ))
+            using (new SystemAccount())
+            {
+                IndexManager.Start(TextWriter.Null);
+
+                var qtext = "Id:{{Name:'MyDocument.doc' .SELECT:OwnerId}}";
+                var cquery = ContentQuery_NEW.CreateQuery(qtext, QuerySettings.AdminSettings);
+                var cqueryAcc = new PrivateObject(cquery);
+                cqueryAcc.SetFieldOrProperty("IsSafe", true);
+                result = cquery.Execute();
+            } 
+
+            Assert.AreEqual(42, result.Identifiers.First());
+            Assert.AreEqual(42, result.Count);
+
+            Assert.AreEqual(2, log.Count);
+            Assert.AreEqual("Name:'MyDocument.doc' .SELECT:OwnerId", log[0]);
+            Assert.AreEqual("Id:(1 3 7)", log[1]);
+        }
+
+        //UNDONE:!!!!!!!! TEST AND DEVELOP in InMem: Id:(1 2 (+3 +4))
+        //UNDONE:!!!!!!!! UNITTEST Recursive with RecursiveExecutor's log
+        //UNDONE:!!!!!!!! TEST Indexing: Stored data is not complete (e.g.: Name = null)
+
         /* ============================================================================ */
 
         private InMemoryIndex GetTestIndex()
@@ -875,6 +969,99 @@ namespace SenseNet.SearchImpl.Tests
             foreach (var observer in NodeObserver.GetObserverTypes())
                 node.DisableObserver(observer);
             node.Save();
+        }
+
+
+
+        private class SearchEngineForNestedQueryTests : ISearchEngine
+        {
+            private class QueryEngineForNestedQueryTests : IQueryEngine
+            {
+                private readonly Dictionary<string, string[]> _mockResultsPerQueries;
+                private readonly List<string> _log;
+                public QueryEngineForNestedQueryTests(Dictionary<string, string[]> mockResultsPerQueries, List<string> log)
+                {
+                    _mockResultsPerQueries = mockResultsPerQueries;
+                    _log = log;
+                }
+
+                public IQueryResult<int> ExecuteQuery(SnQuery query, IPermissionFilter filter)
+                {
+                    _log.Add(query.Querytext);
+                    return new QueryResult<int>(new [] {42}, 42);
+                }
+                public IQueryResult<string> ExecuteQueryAndProject(SnQuery query, IPermissionFilter filter)
+                {
+                    var strings = _mockResultsPerQueries[query.Querytext];
+                    _log.Add(query.Querytext);
+                    return new QueryResult<string>(strings, strings.Length);
+                }
+            }
+
+            private class IndexingEngineForNestedQueryTests : IIndexingEngine
+            {
+                public bool Running { get { return true; } }
+                public void Start(TextWriter consoleOut)
+                {
+                    // do nothing
+                }
+                public void ShutDown()
+                {
+                    // do nothing
+                }
+                public void ActivityFinished()
+                {
+                    throw new NotImplementedException();
+                }
+                public void Commit(int lastActivityId = 0)
+                {
+                    throw new NotImplementedException();
+                }
+                public void ClearIndex()
+                {
+                    throw new NotImplementedException();
+                }
+                public IIndexingActivityStatus ReadActivityStatusFromIndex()
+                {
+                    throw new NotImplementedException();
+                }
+                public IEnumerable<IndexDocument> GetDocumentsByNodeId(int nodeId)
+                {
+                    throw new NotImplementedException();
+                }
+                public void Actualize(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates)
+                {
+                    throw new NotImplementedException();
+                }
+                public void Actualize(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> addition)
+                {
+                    throw new NotImplementedException();
+                }
+            }
+
+            private readonly Dictionary<string, string[]> _mockResultsPerQueries;
+            private readonly List<string> _log;
+
+            public SearchEngineForNestedQueryTests(Dictionary<string, string[]> mockResultsPerQueries, List<string> log)
+            {
+                _mockResultsPerQueries = mockResultsPerQueries;
+                _log = log;
+            }
+
+            public IIndexingEngine IndexingEngine => new IndexingEngineForNestedQueryTests();
+            public IQueryEngine QueryEngine => new QueryEngineForNestedQueryTests(_mockResultsPerQueries, _log);
+            public IDictionary<string, Type> GetAnalyzers()
+            {
+                throw new NotImplementedException();
+            }
+            public void SetIndexingInfo(object indexingInfo)
+            {
+                throw new NotImplementedException();
+            }
+            public IIndexPopulator GetPopulator()
+            {
+                throw new NotImplementedException();
+            }
         }
     }
 }

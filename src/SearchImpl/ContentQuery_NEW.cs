@@ -2,20 +2,18 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using SenseNet.Configuration;
-using SenseNet.ContentRepository.Search;
-using SenseNet.ContentRepository.Storage;
 using SenseNet.ContentRepository.Storage.Security;
 using SenseNet.Diagnostics;
 using SenseNet.Search.Parser;
-using SenseNet.Tools;
 
 namespace SenseNet.Search
 {
-    public class ContentQuery_NEW
+    //UNDONE: remove ReSharper comment if the ContentQuery_NEW is renamed well.
+    // ReSharper disable once InconsistentNaming
+    public class ContentQuery_NEW //UNDONE: Delete original ContentQuery and rename this to ContentQuery
     {
         private static readonly string[] QuerySettingParts = new[] { "SKIP", "TOP", "SORT", "REVERSESORT", "AUTOFILTERS", "LIFESPAN", "COUNTONLY" };
         private static readonly string RegexKeywordsAndComments = "//|/\\*|(\\.(?<keyword>[A-Z]+)(([ ]*:[ ]*[#]?\\w+(\\.\\w+)?)|([\\) $\\r\\n]+)))";
@@ -114,7 +112,7 @@ namespace SenseNet.Search
                 foreach (var x in enumerableValue)
                     if (x != null)
                         escaped.Add(EscapeParameter(x.ToString()));
-                var joined = String.Join(" ", escaped);
+                var joined = string.Join(" ", escaped);
                 if (escaped.Count < 2)
                     return joined;
                 return "(" + joined + ")";
@@ -261,7 +259,7 @@ namespace SenseNet.Search
 
         private static string FixMultilineComment(string queryText)
         {
-            if (String.IsNullOrEmpty(queryText))
+            if (string.IsNullOrEmpty(queryText))
                 return queryText;
 
             // find the last multiline comment
@@ -295,16 +293,11 @@ namespace SenseNet.Search
             return queryText.Length;
         }
 
-        private static int GetDefaultMaxResults()
-        {
-            return Int32.MaxValue;
-        }
-
         public QueryResult Execute()
         {
             var queryText = Text;
 
-            if (String.IsNullOrEmpty(queryText))
+            if (string.IsNullOrEmpty(queryText))
                 throw new InvalidOperationException("Cannot execute query with null or empty Text");
 
             var userId = AccessProvider.Current.GetCurrentUser().Id;
@@ -317,147 +310,97 @@ namespace SenseNet.Search
                 throw ex;
             }
 
-            IEnumerable<int> identifiers;
-            int totalCount;
+            QueryResult result;
             using (var op = SnTrace.Query.StartOperation("ContentQuery: {0} | Top:{1} Skip:{2} Sort:{3} Mode:{4}", queryText, _settings.Top, _settings.Skip, _settings.Sort, _settings.QueryExecutionMode))
             {
                 if (!queryText.Contains("}}"))
                 {
-                    //var lucObjects = ExecuteAtomic(queryText, Settings.Top, Settings.Skip, Settings.Sort, Settings.EnableAutofilters,
-                    //    Settings.EnableLifespanFilter, Settings.QueryExecutionMode, Settings, false, out projection,
-                    //    out totalCount);
-                    //identifiers = lucObjects.Select(l => l.NodeId).ToArray();
-                    var result = SnQuery.Query(queryText, new SnQueryContext(Settings, userId));
-                    identifiers = result.Hits;
-                    totalCount = result.TotalCount;
+                    var snQueryResultresult = SnQuery.Query(queryText, new SnQueryContext(Settings, userId));
+                    result = new QueryResult(snQueryResultresult.Hits, snQueryResultresult.TotalCount);
                 }
                 else
                 {
-                    List<string> log;
-                    identifiers = RecursiveExecutor.ExecuteRecursive(queryText, Settings.Top, Settings.Skip, Settings.Sort, Settings.EnableAutofilters,
-                        Settings.EnableLifespanFilter, Settings.QueryExecutionMode,
-                        Settings, out totalCount, out log);
+                    result = RecursiveExecutor.ExecuteRecursive(queryText, Settings, userId);
                 }
                 op.Successful = true;
             }
-            return new QueryResult(identifiers, totalCount);
-        }
-
-
-        //UNDONE: ## Deepest level in the general layer
-        private static IEnumerable<LucObject> ExecuteAtomic_DELETE(string queryText, int top, int skip, IEnumerable<SortInfo> sort, FilterStatus enableAutofilters, FilterStatus enableLifespanFilter, QueryExecutionMode executionMode, QuerySettings settings, bool enableProjection, out string projection, out int totalCount)
-        {
-            LucQuery query;
-
-            try
-            {
-                query = LucQuery.Parse(queryText);
-            }
-            catch (ParserException ex)
-            {
-                throw new InvalidContentQueryException(queryText, innerException: ex);
-            }
-
-            projection = query.Projection;
-            if (projection != null)
-            {
-                if (!enableProjection)
-                    throw new ApplicationException(
-                        $"Projection in top level query is not allowed ({SnLucLexer.Keywords.Select}:{projection})");
-                query.ForceLuceneExecution = true;
-            }
-
-            if (skip != 0)
-                query.Skip = skip;
-
-            if (query.Top == 0)
-                query.Top = GetDefaultMaxResults();
-            if (top == 0)
-                top = GetDefaultMaxResults();
-            query.Top = Math.Min(top, query.Top);
-            query.PageSize = query.Top;
-
-            if (sort != null && sort.Any())
-                query.SetSort(sort);
-
-            if (enableAutofilters != FilterStatus.Default)
-                query.EnableAutofilters = enableAutofilters;
-            if (enableLifespanFilter != FilterStatus.Default)
-                query.EnableLifespanFilter = enableLifespanFilter;
-            if (executionMode != QueryExecutionMode.Default)
-                query.QueryExecutionMode = executionMode;
-
-            // Re-set settings values. This is important for NodeList that
-            // uses the paging info written into the query text.
-            if (settings != null)
-            {
-                settings.Top = query.PageSize;
-                settings.Skip = query.Skip;
-            }
-
-            var lucObjects = query.Execute().ToList();
-            totalCount = query.TotalCount;
-            return lucObjects;
+            return result;
         }
 
         // ================================================================== Recursive executor class
 
         private static class RecursiveExecutor
         {
-            private class InnerQueryResult
+            private static readonly Regex EscaperRegex;
+            static RecursiveExecutor()
             {
-                internal string[] StringArray;
-                internal int[] IntArray;
+                var pattern = new StringBuilder("[");
+                foreach (var c in SnLucLexer.STRINGTERMINATORCHARS.ToCharArray())
+                    pattern.Append("\\" + c);
+                pattern.Append("]");
+                EscaperRegex = new Regex(pattern.ToString());
             }
 
-            public static IEnumerable<int> ExecuteRecursive(string queryText, int top, int skip,
-                IEnumerable<SortInfo> sort, FilterStatus enableAutofilters, FilterStatus enableLifespanFilter, QueryExecutionMode executionMode,
-                QuerySettings settings, out int count, out List<string> log)
+            public static QueryResult ExecuteRecursive(string queryText, QuerySettings querySettings, int userId)
             {
-                log = new List<string>();
-                IEnumerable<int> result = new int[0];
+                QueryResult result;
+
                 var src = queryText;
-                log.Add(src);
                 var control = GetControlString(src);
+
+                var recursiveQuerySettings = new QuerySettings
+                {
+                    Skip = 0,
+                    Top = 0,
+                    Sort = querySettings.Sort,
+                    EnableAutofilters = querySettings.EnableAutofilters,
+                    EnableLifespanFilter = querySettings.EnableLifespanFilter,
+                    QueryExecutionMode = querySettings.QueryExecutionMode
+                };
+                var recursiveQueryContext = new SnQueryContext(recursiveQuerySettings, userId);
 
                 while (true)
                 {
                     int start;
-                    var sss = GetInnerScript(src, control, out start);
-                    var end = sss == String.Empty;
+                    var innerScript = GetInnerScript(src, control, out start);
+                    var end = innerScript == string.Empty;
 
                     if (!end)
                     {
-                        src = src.Remove(start, sss.Length);
-                        control = control.Remove(start, sss.Length);
+                        src = src.Remove(start, innerScript.Length);
+                        control = control.Remove(start, innerScript.Length);
 
-                        int innerCount;
-                        var innerResult = ExecuteInnerScript(sss.Substring(2, sss.Length - 4), 0, 0,
-                            sort, enableAutofilters, enableLifespanFilter, executionMode, null, true, out innerCount).StringArray;
+                        // execute inner query
+                        var subQuery = innerScript.Substring(2, innerScript.Length - 4);
+                        var snQueryresult = SnQuery.QueryAndProject(subQuery, recursiveQueryContext);
+                        var innerResult = snQueryresult.Hits
+                                .Where(s => !string.IsNullOrEmpty(s))
+                                .Select(EscapeForQuery)
+                                .ToArray();
 
+
+                        // process inner query result
                         switch (innerResult.Length)
                         {
                             case 0:
-                                sss = SnQuery.EmptyInnerQueryText;
+                                innerScript = SnQuery.EmptyInnerQueryText;
                                 break;
                             case 1:
-                                sss = innerResult[0];
+                                innerScript = innerResult[0];
                                 break;
                             default:
-                                sss = String.Join(" ", innerResult);
-                                sss = "(" + sss + ")";
+                                innerScript = string.Join(" ", innerResult);
+                                innerScript = "(" + innerScript + ")";
                                 break;
                         }
-                        src = src.Insert(start, sss);
-                        control = control.Insert(start, sss);
-                        log.Add(src);
+                        src = src.Insert(start, innerScript);
+                        control = control.Insert(start, innerScript);
                     }
                     else
                     {
-                        result = ExecuteInnerScript(src, top, skip, sort, enableAutofilters, enableLifespanFilter, executionMode,
-                            settings, false, out count).IntArray;
-
-                        log.Add(String.Join(" ", result.Select(i => i.ToString()).ToArray()));
+                        // execute and process top level query
+                        var snQueryresult = SnQuery.Query(src, new SnQueryContext(querySettings, userId));
+                        result = new QueryResult(snQueryresult.Hits.ToArray(), snQueryresult.TotalCount);
                         break;
                     }
                 }
@@ -519,56 +462,18 @@ namespace SenseNet.Search
                 start = 0;
                 var p1 = control.IndexOf("}}");
                 if (p1 < 0)
-                    return String.Empty;
+                    return string.Empty;
                 var p0 = control.LastIndexOf("{{", p1);
                 if (p0 < 0)
-                    return String.Empty;
+                    return string.Empty;
                 start = p0;
                 var ss = src.Substring(p0, p1 - p0 + 2);
                 return ss;
             }
-
-            private static InnerQueryResult ExecuteInnerScript(string queryText, int top, int skip, IEnumerable<SortInfo> sort, FilterStatus enableAutofilters, FilterStatus enableLifespanFilter, QueryExecutionMode executionMode, QuerySettings settings, bool enableProjection, out int totalCount)
-            {
-                InnerQueryResult result;
-
-                string projection;
-                var lucObjects = ExecuteAtomic_DELETE(queryText, top, skip, sort, enableAutofilters, enableLifespanFilter, executionMode, settings, enableProjection, out projection, out totalCount);
-
-                if (projection == null || !enableProjection)
-                {
-                    var idResult = lucObjects.Select(o => o.NodeId).ToArray();
-                    result = new InnerQueryResult { IntArray = idResult };
-                    if (enableProjection)
-                        result.StringArray = idResult.Select(i => i.ToString()).ToArray();
-                }
-                else
-                {
-                    var stringResult = lucObjects.Select(o => o[projection, false]).Where(r => !String.IsNullOrEmpty(r));
-                    var escaped = new List<string>();
-                    foreach (var s in stringResult)
-                        escaped.Add(EscapeForQuery(s));
-                    result = new InnerQueryResult { StringArray = escaped.ToArray() };
-                }
-
-                return result;
-            }
-
-            private static readonly Regex EscaperRegex;
-
-            static RecursiveExecutor()
-            {
-                var pattern = new StringBuilder("[");
-                foreach (var c in SnLucLexer.STRINGTERMINATORCHARS.ToCharArray())
-                    pattern.Append("\\" + c);
-                pattern.Append("]");
-                EscaperRegex = new Regex(pattern.ToString());
-            }
-
             private static string EscapeForQuery(string value)
             {
                 if (EscaperRegex.IsMatch(value))
-                    return String.Concat("'", value, "'");
+                    return string.Concat("'", value, "'");
                 return value;
             }
         }
