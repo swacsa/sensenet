@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace SenseNet.Search.Parser
 {
@@ -8,6 +9,15 @@ namespace SenseNet.Search.Parser
 
         public QuerySettings Settings { get; }
         public int UserId { get; }
+
+        public IQueryEngine QueryEngine
+        {
+            get
+            {
+                throw new NotImplementedException();
+            }
+        }
+
         public IPerFieldIndexingInfo GetPerFieldIndexingInfo(string fieldName)
         {
             return _indexingInfo[fieldName];
