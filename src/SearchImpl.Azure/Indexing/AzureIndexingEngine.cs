@@ -36,9 +36,9 @@ namespace SenseNet.Search.Azure.Indexing
 
         //private static IActivityQueueConnector _queueConnector;
         //private AzureQueryExecutor _queryExecutor;
-        private AzureQueryEngine _queryEngine;
+        private IIndexingQuery _queryEngine;
 
-        public AzureIndexingEngine(AzureQueryEngine queryEngine, IDocumentsOperations documents)
+        public AzureIndexingEngine(IIndexingQuery queryEngine, IDocumentsOperations documents)
         {
             if (_credentials == null)
             {
@@ -183,7 +183,7 @@ namespace SenseNet.Search.Azure.Indexing
                 var searchText = GetFilterCondition(dels, out filter);
                 AzureSearchParameters queryParameters = new AzureSearchParameters {SearchText = searchText, Filter = filter};
                 //PermissionChecker permisionChecker = new PermissionChecker(AccessProvider.Current.GetCurrentUser(), QueryFieldLevel.HeadOnly, true);
-                var deletables = _queryEngine.Search(queryParameters).Results.Select(r => r.Document).ToArray(); 
+                var deletables = _queryEngine.GetDocuments(queryParameters).Results.Select(r => r.Document).ToArray(); 
                 //_queryExecutor.Initialize(queryParameters, permisionChecker);
                 //var deletables = _queryExecutor.Execute();
                 if (deletables.Any())

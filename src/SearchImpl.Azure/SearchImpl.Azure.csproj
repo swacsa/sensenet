@@ -80,6 +80,9 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Querying\AzureQueryCompiler.cs" />
     <Compile Include="Querying\AzureQueryExecutor.cs" />
+    <Compile Include="Querying\IIndexingQuery.cs" />
+    <Compile Include="Querying\IQueryCompiler.cs" />
+    <Compile Include="Querying\Models\AzureQueryResult.cs" />
     <Compile Include="Querying\SnQueryToAzureQueryVisitor.cs" />
     <Compile Include="Querying\AzureQueryEngine.cs" />
     <Compile Include="Querying\Models\AzureSearchParameters.cs" />

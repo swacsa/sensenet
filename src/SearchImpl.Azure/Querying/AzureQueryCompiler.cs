@@ -5,7 +5,7 @@ using SenseNet.Search.Parser;
 
 namespace SenseNet.Search.Azure.Querying
 {
-    public class AzureQueryCompiler
+    public class AzureQueryCompiler: IQueryCompiler
     {
         public AzureSearchParameters Compile(SnQuery query, IQueryContext context)
         {

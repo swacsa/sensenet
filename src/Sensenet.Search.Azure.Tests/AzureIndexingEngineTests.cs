@@ -21,7 +21,8 @@ namespace Sensenet.Search.Azure.Tests
         public void ActualizeTest()
         {
             string text= null;
-            SearchParameters parameters = null;
+            string searchText = null;
+            SearchParameters parameters = new SearchParameters();
             var mockDocuments = new Mock<IDocumentsOperations>();
             var searchResult = new AzureOperationResponse<DocumentSearchResult>();
             searchResult.Body = new DocumentSearchResult();
@@ -40,7 +41,7 @@ namespace Sensenet.Search.Azure.Tests
                 });
             var indexResult = new AzureOperationResponse<DocumentIndexResult>();
             var indexingResults = new List<IndexingResult>();
-            indexingResults.Add(new IndexingResult("12", null, true) );
+            indexingResults.Add(new IndexingResult("12", null, true));
             indexingResults.Add(new IndexingResult("13", null, true));
             indexingResults.Add(new IndexingResult("0", null, true));
             indexingResults.Add(new IndexingResult("1", null, true));
@@ -48,9 +49,18 @@ namespace Sensenet.Search.Azure.Tests
             indexResult.Body = new DocumentIndexResult(indexingResults);
             var indexTask = Task.FromResult(indexResult);
             mockDocuments.Setup(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken))).Returns(indexTask);
-            
-           var queryEngine = new AzureQueryEngine(mockDocuments.Object);
-            var indexingEngine = new AzureIndexingEngine(queryEngine, mockDocuments.Object);
+
+            //var queryEngine = new AzureQueryEngine(mockDocuments.Object);
+            var mockQueryEngine = new Mock<IIndexingQuery>();
+            mockQueryEngine.Setup(o => o.GetDocuments(It.IsAny<AzureSearchParameters>())).Returns(searchResult.Body).Callback((AzureSearchParameters p) =>
+            {
+                searchText = p.SearchText;
+                parameters.Filter = p.Filter;
+                parameters.IncludeTotalResultCount = p.IncludeTotalResultCount;
+                parameters.Skip = p.Skip;
+                parameters.Top = p.Top;
+            });
+            var indexingEngine = new AzureIndexingEngine(mockQueryEngine.Object, mockDocuments.Object);
             var deletions = new List<SnTerm>();
             deletions.Add(new SnTerm("VersionId", "12"));
             var addable = new IndexDocument();
@@ -66,15 +76,14 @@ namespace Sensenet.Search.Azure.Tests
             }
             indexingEngine.Actualize(deletions, addable, updateables);
 
-            mockDocuments.Verify(o => o.SearchWithHttpMessagesAsync(It.IsAny<string>(), It.IsAny<SearchParameters>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)), Times.Once);
+            mockQueryEngine.Verify(o => o.GetDocuments(It.IsAny<AzureSearchParameters>()), Times.Once);
+            //mockDocuments.Verify(o => o.SearchWithHttpMessagesAsync(It.IsAny<string>(), It.IsAny<SearchParameters>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)), Times.Once);
             mockDocuments.Verify(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)), Times.Once);
-            Assert.Equal("VersionId:12", text);
+            Assert.Equal("VersionId:12", searchText);
             Assert.Equal("", parameters.Filter);
             Assert.Equal(false, parameters.IncludeTotalResultCount);
-            Assert.Equal(QueryType.Full, parameters.QueryType);
-            Assert.Equal(SearchMode.All, parameters.SearchMode);
             Assert.Equal(null, parameters.Skip);
-            Assert.Equal(1000, parameters.Top);
+            Assert.Equal(null, parameters.Top);
         }
 
         [Fact]
@@ -103,8 +112,8 @@ namespace Sensenet.Search.Azure.Tests
             var indexTask = Task.FromResult(indexResult);
             mockDocuments.Setup(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken))).Returns(indexTask);
 
-            var mockQueryEngine = new Mock<AzureQueryEngine>(mockDocuments.Object);
-            mockQueryEngine.Setup(o => o.Search(It.IsAny<AzureSearchParameters>())).Returns(searchResult.Body).Callback((AzureSearchParameters p) =>
+            var mockQueryEngine = new Mock<IIndexingQuery>();
+            mockQueryEngine.Setup(o => o.GetDocuments(It.IsAny<AzureSearchParameters>())).Returns(searchResult.Body).Callback((AzureSearchParameters p) =>
             {
                 filter = p.Filter;
                 searchText = p.SearchText;
@@ -128,7 +137,7 @@ namespace Sensenet.Search.Azure.Tests
             }
             indexingEngine.Actualize(deletions, addable, updateables);
 
-            mockQueryEngine.Verify(o => o.Search(It.IsAny<AzureSearchParameters>()), Times.Once);
+            mockQueryEngine.Verify(o => o.GetDocuments(It.IsAny<AzureSearchParameters>()), Times.Once);
             mockDocuments.Verify(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)), Times.Once);
             Assert.Equal("search.in(VersionId,'2,12,5')", filter);
             Assert.Equal("", searchText);
@@ -136,5 +145,6 @@ namespace Sensenet.Search.Azure.Tests
             Assert.Equal(null, parameters.Skip);
             Assert.Equal(null, parameters.Top);
         }
+
     }
 }

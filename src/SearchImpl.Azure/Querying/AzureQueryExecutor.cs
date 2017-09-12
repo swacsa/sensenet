@@ -14,10 +14,10 @@ namespace SenseNet.Search.Azure.Querying
         public AzureSearchParameters QueryParameters => _queryParameters;
         public PermissionChecker PermissionChecker => _permissionChecker;
 
-        private AzureQueryEngine _queryEngine;
+        private IIndexingQuery _queryEngine;
 
 
-        public AzureQueryExecutor(AzureQueryEngine queryEngine)
+        public AzureQueryExecutor(IIndexingQuery queryEngine)
         {
             _queryEngine = queryEngine;
         }
@@ -28,7 +28,7 @@ namespace SenseNet.Search.Azure.Querying
 
         public IEnumerable<IndexDocument> Execute()
         {
-            var result = _queryEngine.Search(_queryParameters);
+            var result = _queryEngine.GetDocuments(_queryParameters);
             var documents = result.Results.Select(r => r.Document);
             return null; //documents;
         }

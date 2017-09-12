@@ -1,46 +1,32 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Search;
 using Microsoft.Azure.Search.Models;
 using SenseNet.Search.Azure.Querying.Models;
+using SenseNet.Search.Parser;
 
 namespace SenseNet.Search.Azure.Querying
 {
-    public class AzureQueryEngine: IQueryEngine
+    public class AzureQueryEngine: IIndexingQuery//IQueryEngine
     {
-        private static string _apiKey = "";
-        private static string _schema = "https://";
-        private static string _serviceName = "";
-        private static string _indexName = "";
-        private static string _dnsSuffix = "search.windows.net/indexes/";
-        //private static string _apiVersion = "2016-09-01";
-        private static int? _operationTimeout = 60;
-        //private static int _top = 1000;
-
-        private static SearchCredentials _credentials;
-        private static ISearchIndexClient _indexClient;
         private static IDocumentsOperations _documents;
-        //private Dictionary<string, List<string>> _customHeaders = null;
+        private static IQueryCompiler _compiler;
 
-        public AzureQueryEngine()
+        public AzureQueryEngine(ISearchIndexClient client, IQueryCompiler compiler)
         {
-            if (_credentials == null)
-            {
-                _credentials = new SearchCredentials(_apiKey);
-                _indexClient = new SearchIndexClient(_serviceName, _indexName, _credentials); 
-                _indexClient.BaseUri = new Uri(_schema + _serviceName + "." + _dnsSuffix + _indexName);
-                _indexClient.LongRunningOperationRetryTimeout = _operationTimeout;
-                _documents = _indexClient.Documents;
-            }
+            _documents = client.Documents;
+            _compiler = compiler;
         }
 
-        public AzureQueryEngine(IDocumentsOperations documentsOperations)
-        {
-            _documents = documentsOperations;
-        }
+        //public AzureQueryEngine(IDocumentsOperations documentsOperations)
+        //{
+        //    _documents = documentsOperations;
+        //}
 
-        public Task<DocumentSearchResult> SearchAsync(out CancellationToken cancellationToken, AzureSearchParameters searchParameters = null)
+        #region Azure calls
+        private Task<DocumentSearchResult> SearchAsync(out CancellationToken cancellationToken, AzureSearchParameters searchParameters = null)
         {
             cancellationToken = new CancellationToken();
             if (searchParameters == null)
@@ -50,13 +36,13 @@ namespace SenseNet.Search.Azure.Querying
             return Task.Factory.StartNew(()=>Search(searchParameters), cancellationToken);
         }
 
-        public virtual DocumentSearchResult Search(AzureSearchParameters searchParameters)
+        private DocumentSearchResult Search(AzureSearchParameters searchParameters)
         {
             return _documents.SearchWithHttpMessagesAsync(searchParameters.SearchText, (SearchParameters)searchParameters).Result.Body;
             //return _documents.Search(searchParameters.SearchText, (SearchParameters)searchParameters);
         }
 
-        public Task<DocumentSearchResult> CountAsync(out CancellationToken cancellationToken, AzureSearchParameters searchParameters = null)
+        private Task<DocumentSearchResult> CountAsync(out CancellationToken cancellationToken, AzureSearchParameters searchParameters = null)
         {
             cancellationToken = new CancellationToken();
             if (searchParameters == null)
@@ -66,21 +52,42 @@ namespace SenseNet.Search.Azure.Querying
             return Task.Factory.StartNew(() => Count(searchParameters), cancellationToken);
         }
 
-        public DocumentSearchResult Count(AzureSearchParameters searchParameters)
+        private DocumentSearchResult Count(AzureSearchParameters searchParameters)
         {
             searchParameters.IncludeTotalResultCount = true;
             searchParameters.Top = 0;
             return _documents.Search(searchParameters.SearchText, (SearchParameters)searchParameters);
         }
 
-        public IQueryResult<int> ExecuteQuery(SnQuery query, IPermissionFilter filter)
+        #endregion
+
+        #region IIndexingQuery
+
+        public DocumentSearchResult GetDocuments(AzureSearchParameters searchParameters)
         {
-            throw new NotImplementedException();
+            return Search(searchParameters);
+        }
+        #endregion
+
+        #region IQueryEngine
+
+        public IQueryResult<Document> ExecuteQuery(SnQuery query, IPermissionFilter filter)
+        {
+            IDictionary<string, IPerFieldIndexingInfo> indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>();
+            var queryContext = new QueryContext(QuerySettings.Default, 0, indexingInfo);
+            var searchParameters = _compiler.Compile(query, queryContext);
+            var result = Search(searchParameters);
+            if (result != null)
+            {
+                return AzureQueryResult.Parse(result);
+            }
+            return null;
         }
 
         public IQueryResult<string> ExecuteQueryAndProject(SnQuery query, IPermissionFilter filter)
         {
             throw new NotImplementedException();
         }
+        #endregion
     }
 }
