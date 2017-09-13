@@ -17,6 +17,7 @@ using SenseNet.Search;
 using SenseNet.Search.Indexing;
 using SenseNet.Search.Lucene29;
 using SenseNet.SearchImpl.Tests.Implementations;
+using SenseNet.Security.Data;
 using SafeQueries = SenseNet.SearchImpl.Tests.Implementations.SafeQueries;
 
 namespace SenseNet.SearchImpl.Tests
@@ -24,7 +25,7 @@ namespace SenseNet.SearchImpl.Tests
     [TestClass]
     public class InMemorySearchTests : TestBase
     {
-        [TestMethod]
+        [TestMethod, TestCategory("IR")]
         public void InMemSearch_Indexing_Create()
         {
             Node node;
@@ -96,7 +97,7 @@ namespace SenseNet.SearchImpl.Tests
             Assert.IsNotNull(hit5);
         }
 
-        [TestMethod]
+        [TestMethod, TestCategory("IR")]
         public void InMemSearch_Indexing_Update()
         {
             Node node;
@@ -182,7 +183,7 @@ namespace SenseNet.SearchImpl.Tests
             Assert.IsNotNull(hit7);
         }
 
-        [TestMethod]
+        [TestMethod, TestCategory("IR")]
         public void InMemSearch_Indexing_Delete()
         {
             Node node1, node2;
@@ -273,7 +274,7 @@ namespace SenseNet.SearchImpl.Tests
             Assert.IsNotNull(hit10);
         }
 
-        [TestMethod]
+        [TestMethod, TestCategory("IR")]
         public void InMemSearch_Indexing_Rename()
         {
             Node node1; // /Root/Node1
@@ -299,6 +300,8 @@ namespace SenseNet.SearchImpl.Tests
                 node1 = Node.LoadNode(node1.Id);
                 node1.Name = "Node1Renamed";
                 SaveNode(node1);
+
+                DistributedApplication.Cache.Reset(); //UNDONE:!!!!!!!!! The test should work without explicitly cleared cache
 
                 // reload the newly created.
                 nodes = new[]
@@ -407,7 +410,7 @@ namespace SenseNet.SearchImpl.Tests
         }
 
 
-        [TestMethod]
+        [TestMethod, TestCategory("IR")]
         public void InMemSearch_Indexing_AddTextEctract()
         {
             Node node;
@@ -433,41 +436,39 @@ namespace SenseNet.SearchImpl.Tests
 
                 // load the pre-converted index document
                 var db = DataProvider.Current;
-                var indexDocument = db.LoadIndexDocumentByVersionId(node.VersionId);
+                var indexDoc = db.LoadIndexDocumentByVersionId(node.VersionId);
 
-                return new Tuple<Node, IndexDocumentData, InMemoryIndex>(node, indexDocument, GetTestIndex());
+                // check the index document head consistency
+                Assert.IsNotNull(indexDoc);
+                Assert.AreEqual(node.VersionId, indexDoc.VersionId);
+                Assert.IsTrue(indexDoc.IndexDocument.GetStringValue(IndexFieldName.AllText).Contains(additionalText));
+
+                // check executed activities
+                var history = IndexingActivityHistory.GetHistory();
+                Assert.AreEqual(2, history.RecentLength);
+                var item = history.Recent[0];
+                Assert.AreEqual(IndexingActivityType.AddDocument.ToString(), item.TypeName);
+                Assert.AreEqual(null, item.Error);
+                item = history.Recent[1];
+                Assert.AreEqual(IndexingActivityType.Rebuild.ToString(), item.TypeName);
+                Assert.AreEqual(null, item.Error);
+
+                // check index
+                var index = GetTestIndex();
+
+                var hit1 = index.GetStoredFieldsByTerm(new SnTerm(IndexFieldName.Name, "node1"));
+                var hit2 = index.GetStoredFieldsByTerm(new SnTerm(IndexFieldName.VersionId, node.VersionId));
+                var hit3 = index.GetStoredFieldsByTerm(new SnTerm(IndexFieldName.AllText, additionalText));
+
+                Assert.IsNotNull(hit1);
+                Assert.IsNotNull(hit2);
+                Assert.IsNotNull(hit3);
+
+                return new Tuple<Node, IndexDocumentData, InMemoryIndex>(node, indexDoc, GetTestIndex());
             });
-
-            node = result.Item1;
-            var indexDoc = result.Item2;
-            var index = result.Item3;
-
-            // check the index document head consistency
-            Assert.IsNotNull(indexDoc);
-            Assert.AreEqual(node.VersionId, indexDoc.VersionId);
-            Assert.IsTrue(indexDoc.IndexDocument.GetStringValue(IndexFieldName.AllText).Contains(additionalText));
-
-            // check executed activities
-            var history = IndexingActivityHistory.GetHistory();
-            Assert.AreEqual(2, history.RecentLength);
-            var item = history.Recent[0];
-            Assert.AreEqual(IndexingActivityType.AddDocument.ToString(), item.TypeName);
-            Assert.AreEqual(null, item.Error);
-            item = history.Recent[1];
-            Assert.AreEqual(IndexingActivityType.Rebuild.ToString(), item.TypeName);
-            Assert.AreEqual(null, item.Error);
-
-            // check index
-            var hit1 = index.GetStoredFieldsByTerm(new SnTerm(IndexFieldName.Name, "node1"));
-            var hit2 = index.GetStoredFieldsByTerm(new SnTerm(IndexFieldName.VersionId, node.VersionId));
-            var hit3 = index.GetStoredFieldsByTerm(new SnTerm(IndexFieldName.AllText, additionalText));
-
-            Assert.IsNotNull(hit1);
-            Assert.IsNotNull(hit2);
-            Assert.IsNotNull(hit3);
         }
 
-        [TestMethod]
+        [TestMethod, TestCategory("IR")]
         public void InMemSearch_Indexing_ClearAndPopulateAll()
         {
             var sb = new StringBuilder();
@@ -512,7 +513,7 @@ namespace SenseNet.SearchImpl.Tests
 
         /* ============================================================================ */
 
-        [TestMethod]
+        [TestMethod, TestCategory("IR")]
         public void InMemSearch_Query_1Term1Hit()
         {
             Node node;
@@ -540,7 +541,7 @@ namespace SenseNet.SearchImpl.Tests
 
         }
 
-        [TestMethod]
+        [TestMethod, TestCategory("IR")]
         public void InMemSearch_Query_1TermMoreHit1Order()
         {
             var createNode = new Func<Node, string, int, Node>((parent, name, index) =>
@@ -594,7 +595,7 @@ namespace SenseNet.SearchImpl.Tests
             Assert.AreEqual(expectedPaths, actualPaths);
         }
 
-        [TestMethod]
+        [TestMethod, TestCategory("IR")]
         public void InMemSearch_Query_1TermMoreHit2Order()
         {
             var createNode = new Func<Node, string, string, int, Node>((parent, name, displayName, index) =>
@@ -636,7 +637,7 @@ namespace SenseNet.SearchImpl.Tests
             Assert.AreEqual(expectedNames, actualNames);
         }
 
-        [TestMethod]
+        [TestMethod, TestCategory("IR")]
         public void InMemSearch_Query_PrefixOrSuffix()
         {
             var createNode = new Func<Node, string, Node>((parent, name) =>
@@ -679,7 +680,7 @@ namespace SenseNet.SearchImpl.Tests
             Assert.AreEqual("A3, B3, C3", string.Join(", ", nodes2.Select(n => n.Name)));
         }
 
-        [TestMethod]
+        [TestMethod, TestCategory("IR")]
         public void InMemSearch_Query_PrefixAndSuffixOrMiddle()
         {
             var createNode = new Func<Node, string, Node>((parent, name) =>
@@ -722,7 +723,7 @@ namespace SenseNet.SearchImpl.Tests
         }
 
 
-        [TestMethod]
+        [TestMethod, TestCategory("IR")]
         public void InMemSearch_Query_Range()
         {
             var createNode = new Func<Node, string, Node>((parent, name) =>
@@ -778,7 +779,7 @@ namespace SenseNet.SearchImpl.Tests
         }
 
 
-        [TestMethod]
+        [TestMethod, TestCategory("IR")]
         public void InMemSearch_Query_2TermsBool()
         {
             var createNode = new Func<Node, string, int, Node>((parent, name, index) =>
@@ -821,7 +822,7 @@ namespace SenseNet.SearchImpl.Tests
             Assert.AreEqual("A0, A2, A3", result[2]);
         }
 
-        [TestMethod]
+        [TestMethod, TestCategory("IR")]
         public void InMemSearch_Query_MultiLevelBool()
         {
             var createNode = new Func<Node, string, int, Node>((parent, name, index) =>
@@ -865,54 +866,8 @@ namespace SenseNet.SearchImpl.Tests
         }
 
 
-        [TestMethod]
-        public void InMemSearch_Query_Recursive()
-        {
-            var createNode = new Func<Node, string, Node>((parent, name) =>
-            {
-                var node = new SystemFolder(parent) { Name = name };
-                foreach (var observer in NodeObserver.GetObserverTypes())
-                    node.DisableObserver(observer);
-                node.Save();
-                return node;
-            });
-
-            var result = Test(() =>
-            {
-                SaveInitialIndexDocuments();
-                StorageContext.Search.SearchEngine.GetPopulator().ClearAndPopulateAll();
-
-                // create a test structure:
-                var root = Node.LoadNode(Identifiers.PortalRootId);
-                var folder0 = createNode(root, "Folder0");
-                createNode(folder0, "A0");
-                createNode(folder0, "A1");
-                createNode(folder0, "A2");
-                var folder1 = createNode(root, "Folder1");
-                createNode(folder1, "B0");
-                createNode(folder1, "B1");
-                createNode(folder1, "B2");
-                var folder2 = createNode(root, "Folder2");
-                createNode(folder2, "A0");
-                createNode(folder2, "A1");
-                createNode(folder2, "A2");
-
-                // ACTION
-                var settings = QuerySettings.AdminSettings;
-                settings.Sort = new[] { new SortInfo(IndexFieldName.Name) };
-
-                string queryResult = string.Join(", ",
-                    ContentQuery_NEW.Query(SafeQueries.Recursive, settings, "Name", "A*",
-                        "Index", 2).Nodes.Select(n => n.Name).ToArray());
-
-                return queryResult;
-            });
-
-            Assert.AreEqual("Admin", result);
-        }
-
-        [TestMethod]
-        public void InMemSearch_Query_Recursive_1()
+        [TestMethod, TestCategory("IR")]
+        public void InMemSearch_Query_Recursive_One()
         {
             var mock = new Dictionary<string, string[]>
             {
@@ -921,29 +876,21 @@ namespace SenseNet.SearchImpl.Tests
             var log = new List<string>();
             QueryResult result;
 
-            DistributedApplication.Cache.Reset();
-            var repoBuilder = new RepoBuilder();
-            using (RepositoryStart(repoBuilder
+            Indexing.IsOuterSearchEngineEnabled = true;
+            using (var repo = Repository.Start(new RepositoryBuilder()
                 .UseDataProvider(new InMemoryDataProvider())
-                .UseTransactionFactory(repoBuilder.DataProvider)
                 .UseSearchEngine(new SearchEngineForNestedQueryTests(mock, log))
-                .UseSearchEngineSupport(new SearchEngineSupport())
-                .UseAccessProvider(new DesktopAccessProvider())
-                .InitializeTypeHandler(new Dictionary<Type, Type[]>
-                {
-                    {typeof(ElevatedModificationVisibilityRule), new[] {typeof(SnElevatedModificationVisibilityRule)}}
-                })
-                ))
+                .UseSecurityDataProvider(new MemoryDataProvider(DatabaseStorage.CreateEmpty()))
+                .UseElevatedModificationVisibilityRuleProvider(new ElevatedModificationVisibilityRule())
+                .StartWorkflowEngine(false)))
             using (new SystemAccount())
             {
-                IndexManager.Start(TextWriter.Null);
-
                 var qtext = "Id:{{Name:'MyDocument.doc' .SELECT:OwnerId}}";
                 var cquery = ContentQuery_NEW.CreateQuery(qtext, QuerySettings.AdminSettings);
                 var cqueryAcc = new PrivateObject(cquery);
                 cqueryAcc.SetFieldOrProperty("IsSafe", true);
                 result = cquery.Execute();
-            } 
+            }
 
             Assert.AreEqual(42, result.Identifiers.First());
             Assert.AreEqual(42, result.Count);
@@ -953,9 +900,43 @@ namespace SenseNet.SearchImpl.Tests
             Assert.AreEqual("Id:(1 3 7)", log[1]);
         }
 
-        //UNDONE:!!!!!!!! TEST AND DEVELOP in InMem: Id:(1 2 (+3 +4))
-        //UNDONE:!!!!!!!! UNITTEST Recursive with RecursiveExecutor's log
-        //UNDONE:!!!!!!!! TEST Indexing: Stored data is not complete (e.g.: Name = null)
+        [TestMethod, TestCategory("IR")]
+        public void InMemSearch_Query_Recursive_Three()
+        {
+            var qtext = "+F4:{{F2:{{F1:v1 .SELECT:P1}} F3:v4 .SELECT:P2}} +F5:{{F6:v6 .SELECT:P6}}";
+            var mock = new Dictionary<string, string[]>
+            {
+                {"F1:v1 .SELECT:P1", new [] {"v1a", "v1b", "v1c"}},
+                {"F2:(v1a v1b v1c) F3:v4 .SELECT:P2", new [] {"v2a", "v2b", "v2c"}},
+                {"F6:v6 .SELECT:P6", new [] {"v3a", "v3b", "v3c"}}
+            };
+            var log = new List<string>();
+            QueryResult result;
+
+            Indexing.IsOuterSearchEngineEnabled = true;
+            using (var repo = Repository.Start(new RepositoryBuilder()
+                .UseDataProvider(new InMemoryDataProvider())
+                .UseSearchEngine(new SearchEngineForNestedQueryTests(mock, log))
+                .UseSecurityDataProvider(new MemoryDataProvider(DatabaseStorage.CreateEmpty()))
+                .UseElevatedModificationVisibilityRuleProvider(new ElevatedModificationVisibilityRule())
+                .StartWorkflowEngine(false)))
+            using (new SystemAccount())
+            {
+                var cquery = ContentQuery_NEW.CreateQuery(qtext, QuerySettings.AdminSettings);
+                var cqueryAcc = new PrivateObject(cquery);
+                cqueryAcc.SetFieldOrProperty("IsSafe", true);
+                result = cquery.Execute();
+            }
+
+            Assert.AreEqual(42, result.Identifiers.First());
+            Assert.AreEqual(42, result.Count);
+
+            Assert.AreEqual(4, log.Count);
+            Assert.AreEqual("F1:v1 .SELECT:P1", log[0]);
+            Assert.AreEqual("F2:(v1a v1b v1c) F3:v4 .SELECT:P2", log[1]);
+            Assert.AreEqual("F6:v6 .SELECT:P6", log[2]);
+            Assert.AreEqual("+F4:(v2a v2b v2c) +F5:(v3a v3b v3c)", log[3]);
+        }
 
         /* ============================================================================ */
 
@@ -1029,11 +1010,11 @@ namespace SenseNet.SearchImpl.Tests
                 {
                     throw new NotImplementedException();
                 }
-                public void Actualize(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates)
+                public void WriteIndex(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates)
                 {
                     throw new NotImplementedException();
                 }
-                public void Actualize(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> addition)
+                public void WriteIndex(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> addition)
                 {
                     throw new NotImplementedException();
                 }
@@ -1041,6 +1022,8 @@ namespace SenseNet.SearchImpl.Tests
 
             private readonly Dictionary<string, string[]> _mockResultsPerQueries;
             private readonly List<string> _log;
+            private Dictionary<string, string> _analyzerNames;
+            private Dictionary<string, PerFieldIndexingInfo> _perFieldIndexingInfos;
 
             public SearchEngineForNestedQueryTests(Dictionary<string, string[]> mockResultsPerQueries, List<string> log)
             {
@@ -1056,7 +1039,19 @@ namespace SenseNet.SearchImpl.Tests
             }
             public void SetIndexingInfo(object indexingInfo)
             {
-                throw new NotImplementedException();
+                var allInfo = (Dictionary<string, PerFieldIndexingInfo>)indexingInfo;
+                var analyzerNames = new Dictionary<string, string>();
+
+                foreach (var item in allInfo)
+                {
+                    var fieldName = item.Key;
+                    var fieldInfo = item.Value;
+                    if (fieldInfo.Analyzer != null)
+                        analyzerNames.Add(fieldName, fieldInfo.Analyzer);
+                }
+
+                _perFieldIndexingInfos = allInfo;
+                _analyzerNames = analyzerNames;
             }
             public IIndexPopulator GetPopulator()
             {
