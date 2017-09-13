@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Search;
@@ -9,7 +10,7 @@ using SenseNet.Search.Parser;
 
 namespace SenseNet.Search.Azure.Querying
 {
-    public class AzureQueryEngine: IIndexingQuery//IQueryEngine
+    public class AzureQueryEngine: IIndexingQuery, IQueryEngine
     {
         private static IDocumentsOperations _documents;
         private static IQueryCompiler _compiler;
@@ -19,11 +20,6 @@ namespace SenseNet.Search.Azure.Querying
             _documents = client.Documents;
             _compiler = compiler;
         }
-
-        //public AzureQueryEngine(IDocumentsOperations documentsOperations)
-        //{
-        //    _documents = documentsOperations;
-        //}
 
         #region Azure calls
         private Task<DocumentSearchResult> SearchAsync(out CancellationToken cancellationToken, AzureSearchParameters searchParameters = null)
@@ -39,7 +35,6 @@ namespace SenseNet.Search.Azure.Querying
         private DocumentSearchResult Search(AzureSearchParameters searchParameters)
         {
             return _documents.SearchWithHttpMessagesAsync(searchParameters.SearchText, (SearchParameters)searchParameters).Result.Body;
-            //return _documents.Search(searchParameters.SearchText, (SearchParameters)searchParameters);
         }
 
         private Task<DocumentSearchResult> CountAsync(out CancellationToken cancellationToken, AzureSearchParameters searchParameters = null)
@@ -71,7 +66,7 @@ namespace SenseNet.Search.Azure.Querying
 
         #region IQueryEngine
 
-        public IQueryResult<Document> ExecuteQuery(SnQuery query, IPermissionFilter filter)
+        public IQueryResult<int> ExecuteQuery(SnQuery query, IPermissionFilter filter)
         {
             IDictionary<string, IPerFieldIndexingInfo> indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>();
             var queryContext = new QueryContext(QuerySettings.Default, 0, indexingInfo);
@@ -79,7 +74,12 @@ namespace SenseNet.Search.Azure.Querying
             var result = Search(searchParameters);
             if (result != null)
             {
-                return AzureQueryResult.Parse(result);
+                return new QueryResult<int>(result.Results.Select(r =>
+                {
+                    object value;
+                    r.Document.TryGetValue(IndexFieldName.VersionId, out value);
+                    return int.Parse(value.ToString());
+                }), result.Results.Count);
             }
             return null;
         }

@@ -88,7 +88,7 @@ namespace SenseNet.Search.Azure.Indexing
                 {
                     throw;
                 }
-                var failedBatch = batchException.FindFailedActionsToRetry(batch,  r => r.GetStringValue(IndexFieldName.Name));
+                var failedBatch = batchException.FindFailedActionsToRetry(batch,  r => r.GetIntegerValue(IndexFieldName.VersionId).ToString());
                 Thread.Sleep(RetryWaitTime(tryCount));
                 return Index(failedBatch, ++tryCount);
             }
@@ -168,12 +168,21 @@ namespace SenseNet.Search.Azure.Indexing
             throw new NotImplementedException();
         }
 
-        public void Actualize(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates)
+        public void WriteIndex(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates)
         {
-            ActualizePrivate(deletions, addition == null ? null : new [] {addition}, updates);
+            Actualize(deletions, addition == null ? null : new [] {addition}, updates);
+        }
+        public void WriteIndex(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> additions)
+        {
+            Actualize(deletions, additions, null);
         }
 
-        private void ActualizePrivate(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> additions, IEnumerable<DocumentUpdate> updates) 
+        public void ClearIndex()
+        {
+            throw new NotImplementedException();
+        }
+
+        private void Actualize(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> additions, IEnumerable<DocumentUpdate> updates) 
         {
             var indexActions = new List<IndexAction<IndexDocument>>();
             if (deletions != null)
@@ -191,7 +200,7 @@ namespace SenseNet.Search.Azure.Indexing
                     indexActions.AddRange(deletables.Select(d =>
                     {
                         var document = new IndexDocument {};
-                        document.Add(new IndexField("VersionId", int.Parse(d["VersionId"].ToString()), IndexingMode.NotAnalyzed, IndexStoringMode.Yes, IndexTermVector.Default ));
+                        document.Add(new IndexField(IndexFieldName.VersionId, int.Parse(d[IndexFieldName.VersionId].ToString()), IndexingMode.NotAnalyzed, IndexStoringMode.Yes, IndexTermVector.Default ));
                         return IndexAction.Delete(document);
                     }));
                 }
@@ -297,15 +306,6 @@ namespace SenseNet.Search.Azure.Indexing
             var utc = datetime.ToUniversalTime();
             var result = $"{utc.Year}-{utc.Month}-{utc.Day}T{utc.Hour.ToString("D2")}:{utc.Minute.ToString("D2")}:{utc.Second.ToString("D2")}.{utc.Millisecond}Z";
             return result;
-        }
-        public void Actualize(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> additions)
-        {
-            ActualizePrivate(deletions, additions, null);
-        }
-
-        public void ClearIndex()
-        {
-            throw new NotImplementedException();
         }
 
         #endregion
