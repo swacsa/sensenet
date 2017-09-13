@@ -170,7 +170,7 @@ namespace SenseNet.Search.Azure.Indexing
 
         public void Actualize(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates)
         {
-            ActualizePrivate(deletions, new [] {addition}, updates);
+            ActualizePrivate(deletions, addition == null ? null : new [] {addition}, updates);
         }
 
         private void ActualizePrivate(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> additions, IEnumerable<DocumentUpdate> updates) 
@@ -295,7 +295,7 @@ namespace SenseNet.Search.Azure.Indexing
         private string GetODataV4DateTimeUtcString(DateTime datetime)
         {
             var utc = datetime.ToUniversalTime();
-            var result = $"{utc.Year}-{utc.Month}-{utc.Day}T{utc.Hour}:{utc.Minute}:{utc.Second}.{utc.Millisecond}Z";
+            var result = $"{utc.Year}-{utc.Month}-{utc.Day}T{utc.Hour.ToString("D2")}:{utc.Minute.ToString("D2")}:{utc.Second.ToString("D2")}.{utc.Millisecond}Z";
             return result;
         }
         public void Actualize(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> additions)
