@@ -18,7 +18,7 @@ using SenseNet.ContentRepository.Storage.Security;
 namespace SenseNet.Search.Azure.Indexing
 {
     // Azure Search API Version: 2016-09-01
-    public class AzureIndexingEngine: IIndexingEngine
+    public class AzureIndexingEngine : IIndexingEngine
     {
         private static string _apiKey = "";
         private static string _schema = "https://";
@@ -31,29 +31,29 @@ namespace SenseNet.Search.Azure.Indexing
 
         private static SearchCredentials _credentials;
         private static ISearchIndexClient _indexClient;
+
         private static IDocumentsOperations _documents;
+        private static ReaderWriterLockSlim _statusLock = new ReaderWriterLockSlim();
+        private static IActivityStatusPersisitor _status;
         //private Dictionary<string, List<string>> _customHeaders = null;
 
-        //private static IActivityQueueConnector _queueConnector;
         //private AzureQueryExecutor _queryExecutor;
         private IIndexingQuery _queryEngine;
 
-        public AzureIndexingEngine(IIndexingQuery queryEngine, IDocumentsOperations documents)
+        public AzureIndexingEngine(IIndexingQuery queryEngine, IDocumentsOperations documents, IActivityStatusPersisitor status)
         {
-            if (_credentials == null)
-            {
-                //_queryExecutor = new AzureQueryExecutor(new AzureQueryEngine());
-                _queryEngine = queryEngine;
-                //_credentials = new SearchCredentials(_apiKey);
-                //_indexClient = new SearchIndexClient(_serviceName, _indexName, _credentials);
-                //_indexClient.BaseUri = new Uri(_schema + _serviceName + "." + _dnsSuffix + _indexName);
-                //_indexClient.LongRunningOperationRetryTimeout = _operationTimeout;
-                //_documents = _indexClient.Documents;
-                _documents = documents;
-            }
+            //_queryExecutor = new AzureQueryExecutor(new AzureQueryEngine());
+            _queryEngine = queryEngine;
+            _status = status;
+            //_credentials = new SearchCredentials(_apiKey);
+            //_indexClient = new SearchIndexClient(_serviceName, _indexName, _credentials);
+            //_indexClient.BaseUri = new Uri(_schema + _serviceName + "." + _dnsSuffix + _indexName);
+            //_indexClient.LongRunningOperationRetryTimeout = _operationTimeout;
+            //_documents = _indexClient.Documents;
+            _documents = documents;
         }
+
         #region Azure calls
-        private readonly int[] _transientErrorCodes = {207, 422, 503};
 
         public Task<AzureDocumentIndexResult> UploadAsync<T>(IEnumerable<T> documents) where T : IndexDocument
         {
@@ -61,8 +61,8 @@ namespace SenseNet.Search.Azure.Indexing
             {
                 throw new ArgumentNullException("documents");
             }
-            var cancellationToken =  new CancellationToken();
-            return Task.Factory.StartNew(()=> Upload(documents), cancellationToken);
+            var cancellationToken = new CancellationToken();
+            return Task.Factory.StartNew(() => Upload(documents), cancellationToken);
         }
 
         public AzureDocumentIndexResult Upload<T>(IEnumerable<T> documents) where T : IndexDocument
@@ -70,11 +70,11 @@ namespace SenseNet.Search.Azure.Indexing
             return Index(IndexBatch.Upload(documents), 1);
         }
 
-        private AzureDocumentIndexResult Index<T>(IndexBatch<T> batch, int tryCount) where T: IndexDocument
+        private AzureDocumentIndexResult Index<T>(IndexBatch<T> batch, int tryCount) where T : IndexDocument
         {
             try
             {
-                return (AzureDocumentIndexResult)_documents.IndexWithHttpMessagesAsync(batch).Result.Body;
+                return (AzureDocumentIndexResult) _documents.IndexWithHttpMessagesAsync(batch).Result.Body;
             }
             catch (Exception ex)
             {
@@ -82,13 +82,13 @@ namespace SenseNet.Search.Azure.Indexing
                 {
                     throw;
                 }
-                var batchException = (IndexBatchException)ex;
-                var results = batchException.IndexingResults;
-                if (results.Any(r => !r.Succeeded && !_transientErrorCodes.Contains(r.StatusCode)))
+                var batchException = (IndexBatchException) ex;
+                var failedBatch = batchException.FindFailedActionsToRetry(batch,
+                    r => r.GetIntegerValue(IndexFieldName.VersionId).ToString());
+                if (!failedBatch.Actions.Any())
                 {
                     throw;
                 }
-                var failedBatch = batchException.FindFailedActionsToRetry(batch,  r => r.GetIntegerValue(IndexFieldName.VersionId).ToString());
                 Thread.Sleep(RetryWaitTime(tryCount));
                 return Index(failedBatch, ++tryCount);
             }
@@ -121,6 +121,7 @@ namespace SenseNet.Search.Azure.Indexing
 
         public bool Running { get; private set; }
         public bool Paused { get; private set; }
+
         public void Pause()
         {
             Paused = true;
@@ -133,21 +134,22 @@ namespace SenseNet.Search.Azure.Indexing
 
         public void Start(TextWriter consoleOut)
         {
-            
+            Running = true;
         }
 
         public void WaitIfIndexingPaused()
         {
-            
+
         }
 
         public void ShutDown()
         {
-            
+            Running = false;
         }
 
         public void Restart()
         {
+            Running = true;
         }
 
         public void ActivityFinished()
@@ -160,9 +162,30 @@ namespace SenseNet.Search.Azure.Indexing
 
         public IIndexingActivityStatus ReadActivityStatusFromIndex()
         {
-            return null; //CompletionState.ParseFromReader(_queueConnector.GetCompletionInfo());
+            _statusLock.EnterReadLock();
+            try
+            {
+                return _status.GetStatus();
+            }
+            finally
+            {
+                _statusLock.ExitReadLock();
+            }
         }
 
+        public void WriteActivityStatusToIndex(IIndexingActivityStatus state)
+        {
+            _statusLock.EnterWriteLock();
+            try
+            {
+                _status.PutStatus(state);
+            }
+            catch (Exception)
+            {
+                _statusLock.ExitWriteLock();
+                throw;
+            }
+        }
         public IEnumerable<IndexDocument> GetDocumentsByNodeId(int nodeId)
         {
             throw new NotImplementedException();
@@ -191,10 +214,7 @@ namespace SenseNet.Search.Azure.Indexing
                 string filter;
                 var searchText = GetFilterCondition(dels, out filter);
                 AzureSearchParameters queryParameters = new AzureSearchParameters {SearchText = searchText, Filter = filter};
-                //PermissionChecker permisionChecker = new PermissionChecker(AccessProvider.Current.GetCurrentUser(), QueryFieldLevel.HeadOnly, true);
                 var deletables = _queryEngine.GetDocuments(queryParameters).Results.Select(r => r.Document).ToArray(); 
-                //_queryExecutor.Initialize(queryParameters, permisionChecker);
-                //var deletables = _queryExecutor.Execute();
                 if (deletables.Any())
                 {
                     indexActions.AddRange(deletables.Select(d =>

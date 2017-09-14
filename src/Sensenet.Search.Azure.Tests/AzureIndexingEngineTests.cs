@@ -66,7 +66,7 @@ namespace Sensenet.Search.Azure.Tests
                 parameters.Skip = p.Skip;
                 parameters.Top = p.Top;
             });
-            var indexingEngine = new AzureIndexingEngine(mockQueryEngine.Object, mockDocuments.Object);
+            var indexingEngine = new AzureIndexingEngine(mockQueryEngine.Object, mockDocuments.Object, null);
             var deletions = new List<SnTerm>();
             deletions.Add(new SnTerm("VersionId", "12"));
             var addable = new IndexDocument();
@@ -134,7 +134,7 @@ namespace Sensenet.Search.Azure.Tests
                 parameters.Skip = p.Skip;
                 parameters.Top = p.Top;
             });
-            var indexingEngine = new AzureIndexingEngine(mockQueryEngine.Object, mockDocuments.Object);
+            var indexingEngine = new AzureIndexingEngine(mockQueryEngine.Object, mockDocuments.Object, null);
             var deletions = new List<SnTerm>();
             deletions.Add(new SnTerm("VersionId", new [] {"2", "12", "5" }));
             var addable = new IndexDocument();
@@ -210,7 +210,7 @@ namespace Sensenet.Search.Azure.Tests
                 parameters.Skip = p.Skip;
                 parameters.Top = p.Top;
             });
-            var indexingEngine = new AzureIndexingEngine(mockQueryEngine.Object, mockDocuments.Object);
+            var indexingEngine = new AzureIndexingEngine(mockQueryEngine.Object, mockDocuments.Object, null);
 
             indexingEngine.WriteIndex(null, null, null);
 
@@ -273,7 +273,7 @@ namespace Sensenet.Search.Azure.Tests
                 parameters.Skip = p.Skip;
                 parameters.Top = p.Top;
             });
-            var indexingEngine = new AzureIndexingEngine(mockQueryEngine.Object, mockDocuments.Object);
+            var indexingEngine = new AzureIndexingEngine(mockQueryEngine.Object, mockDocuments.Object, null);
             var deletions = new List<SnTerm>();
             deletions.Add(new SnTerm("VersionId", "12"));
             deletions.Add(new SnTerm("Path", "/Root/Global"));
@@ -306,7 +306,7 @@ namespace Sensenet.Search.Azure.Tests
         }
 
         [Fact]
-        public void WriteIndexWithIndexingErrorsTest()
+        public void WriteIndexWithIndexingTransientErrorsTest()
         {
             string text = null;
             string searchText = null;
@@ -366,7 +366,7 @@ namespace Sensenet.Search.Azure.Tests
                 parameters.Skip = p.Skip;
                 parameters.Top = p.Top;
             });
-            var indexingEngine = new AzureIndexingEngine(mockQueryEngine.Object, mockDocuments.Object);
+            var indexingEngine = new AzureIndexingEngine(mockQueryEngine.Object, mockDocuments.Object, null);
             var deletions = new List<SnTerm>();
             deletions.Add(new SnTerm("VersionId", "12"));
             var addable = new IndexDocument();
@@ -395,6 +395,118 @@ namespace Sensenet.Search.Azure.Tests
             Assert.Equal(false, parameters.IncludeTotalResultCount);
             Assert.Equal(null, parameters.Skip);
             Assert.Equal(null, parameters.Top);
+        }
+
+        [Fact]
+        public void WriteIndexWithIndexingFatalErrorsTest()
+        {
+            string text = null;
+            string searchText = null;
+            var batch = default(IndexBatch<IndexDocument>);
+            SearchParameters parameters = new SearchParameters();
+            var mockDocuments = new Mock<IDocumentsOperations>();
+            var searchResult = new AzureOperationResponse<DocumentSearchResult>();
+            searchResult.Body = new DocumentSearchResult();
+            searchResult.Body.Results = new List<SearchResult>();
+            var document = new Document();
+            document.Add("VersionId", "12");
+            document.Add("Name", "ContentName");
+            searchResult.Body.Results.Add(new SearchResult { Document = document });
+            var searchTask = Task.FromResult(searchResult);
+
+            mockDocuments.Setup(o => o.SearchWithHttpMessagesAsync(It.IsAny<string>(), It.IsAny<SearchParameters>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)))
+                .Returns(searchTask).Callback((string st, SearchParameters p, SearchRequestOptions o, Dictionary<string, List<string>> c, CancellationToken t) =>
+                {
+                    text = st;
+                    parameters = p;
+                });
+            var indexResult1 = new AzureOperationResponse<DocumentIndexResult>();
+            var indexingResults1 = new List<IndexingResult>();
+            indexingResults1.Add(new IndexingResult("12", null, false, 400));
+            indexingResults1.Add(new IndexingResult("13", null, true, 200));
+            indexingResults1.Add(new IndexingResult("0", null, true, 200));
+            indexingResults1.Add(new IndexingResult("1", null, false, 404));
+            indexingResults1.Add(new IndexingResult("2", null, true, 200));
+            indexResult1.Body = new DocumentIndexResult(indexingResults1);
+            var indexException = new IndexBatchException(new DocumentIndexResult(indexingResults1));
+            mockDocuments.Setup(o => o.IndexWithHttpMessagesAsync(It.Is<IndexBatch<IndexDocument>>(i => i.Actions.Count() == 5), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)))
+                .Returns((IndexBatch<IndexDocument> b, SearchRequestOptions o, Dictionary<string, List<string>> c, CancellationToken t) =>
+                {
+                    batch = b;
+                    throw indexException;
+                });
+            var mockQueryEngine = new Mock<IIndexingQuery>();
+            mockQueryEngine.Setup(o => o.GetDocuments(It.IsAny<AzureSearchParameters>())).Returns(searchResult.Body).Callback((AzureSearchParameters p) =>
+            {
+                searchText = p.SearchText;
+                parameters.Filter = p.Filter;
+                parameters.IncludeTotalResultCount = p.IncludeTotalResultCount;
+                parameters.Skip = p.Skip;
+                parameters.Top = p.Top;
+            });
+            var indexingEngine = new AzureIndexingEngine(mockQueryEngine.Object, mockDocuments.Object, null);
+            var deletions = new List<SnTerm>();
+            deletions.Add(new SnTerm("VersionId", "12"));
+            var addable = new IndexDocument();
+            addable.Add(new IndexField("VersionId", int.Parse("13"), IndexingMode.NotAnalyzed, IndexStoringMode.Yes, IndexTermVector.Default));
+            addable.Add(new IndexField("Name", "ContentName", IndexingMode.NotAnalyzed, IndexStoringMode.Yes, IndexTermVector.Default));
+            var updateables = new List<DocumentUpdate>();
+            for (int i = 0; i < 3; i++)
+            {
+                var updateable = new IndexDocument();
+                updateable.Add(new IndexField("VersionId", i, IndexingMode.NotAnalyzed, IndexStoringMode.Yes, IndexTermVector.Default));
+                updateable.Add(new IndexField("Name", "ContentName", IndexingMode.NotAnalyzed, IndexStoringMode.Yes, IndexTermVector.Default));
+                updateables.Add(new DocumentUpdate { Document = updateable, UpdateTerm = new SnTerm("", "") });
+            }
+            try
+            {
+                indexingEngine.WriteIndex(deletions, addable, updateables);
+            }
+            catch (Exception ex)
+            {
+                Assert.True(ex is IndexBatchException);
+            }
+            mockQueryEngine.Verify(o => o.GetDocuments(It.IsAny<AzureSearchParameters>()), Times.Once);
+            mockDocuments.Verify(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)), Times.Once);
+            Assert.Equal(1, batch.Actions.Count(a => a.ActionType == IndexActionType.Delete));
+            Assert.Equal(3, batch.Actions.Count(a => a.ActionType == IndexActionType.Merge));
+            Assert.Equal(1, batch.Actions.Count(a => a.ActionType == IndexActionType.MergeOrUpload));
+            Assert.Equal("VersionId:12", searchText);
+            Assert.Equal("", parameters.Filter);
+            Assert.Equal(false, parameters.IncludeTotalResultCount);
+            Assert.Equal(null, parameters.Skip);
+            Assert.Equal(null, parameters.Top);
+        }
+
+        [Fact]
+        public void ReadActivityStatusFromIndexTest()
+        {
+            var mockStatus = new Mock<IActivityStatusPersisitor>();
+            int[] gaps = {1,2};
+            var lastActivity = 3;
+            IIndexingActivityStatus status = new IndexingActivityStatus {LastActivityId = lastActivity, Gaps = gaps};
+            mockStatus.Setup(o => o.GetStatus()).Returns(status);
+            var indexingEngine = new AzureIndexingEngine(null, null, mockStatus.Object);
+
+            var result = indexingEngine.ReadActivityStatusFromIndex();
+
+            Assert.Equal(3, result.LastActivityId);
+            Assert.Equal(2, result.Gaps.Length);
+            Assert.Equal(1, result.Gaps[0]);
+            Assert.Equal(2, result.Gaps[1]);
+        }
+
+        [Fact]
+        public void WriteActivityStatusToIndexTest()
+        {
+            var mockStatus = new Mock<IActivityStatusPersisitor>();
+            int[] gaps = { 1, 2 };
+            var lastActivity = 3;
+            IIndexingActivityStatus status = new IndexingActivityStatus { LastActivityId = lastActivity, Gaps = gaps };
+            mockStatus.Setup(o => o.GetStatus()).Returns(status);
+            var indexingEngine = new AzureIndexingEngine(null, null, mockStatus.Object);
+
+            indexingEngine.WriteActivityStatusToIndex(status);
         }
     }
 }
