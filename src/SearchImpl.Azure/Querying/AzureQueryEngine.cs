@@ -66,11 +66,9 @@ namespace SenseNet.Search.Azure.Querying
 
         #region IQueryEngine
 
-        public IQueryResult<int> ExecuteQuery(SnQuery query, IPermissionFilter filter)
+        public IQueryResult<int> ExecuteQuery(SnQuery query, IPermissionFilter filter, IQueryContext context)
         {
-            IDictionary<string, IPerFieldIndexingInfo> indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>();
-            var queryContext = new QueryContext(QuerySettings.Default, 0, indexingInfo);
-            var searchParameters = _compiler.Compile(query, queryContext);
+            var searchParameters = _compiler.Compile(query, context);
             var result = Search(searchParameters);
             if (result != null)
             {
@@ -84,7 +82,7 @@ namespace SenseNet.Search.Azure.Querying
             return null;
         }
 
-        public IQueryResult<string> ExecuteQueryAndProject(SnQuery query, IPermissionFilter filter)
+        public IQueryResult<string> ExecuteQueryAndProject(SnQuery query, IPermissionFilter filter, IQueryContext context)
         {
             throw new NotImplementedException();
         }

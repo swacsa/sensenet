@@ -75,8 +75,10 @@ namespace Sensenet.Search.Azure.Tests
             var engine = new AzureQueryEngine(mockClient.Object, mockCompiler.Object);
             SnQuery query = new SnQuery();
             query.Querytext = "";
+            IDictionary<string, IPerFieldIndexingInfo> indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>();
+            IQueryContext context = new QueryContext(QuerySettings.Default, 0, indexingInfo);
 
-            var result = engine.ExecuteQuery(query, permissionFilter);
+            var result = engine.ExecuteQuery(query, permissionFilter, context);
 
             Assert.Equal(1,result.Hits.Count());
             Assert.Equal(1, result.TotalCount);
