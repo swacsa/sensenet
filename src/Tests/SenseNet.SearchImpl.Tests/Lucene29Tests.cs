@@ -13,6 +13,7 @@ using SenseNet.ContentRepository.Security;
 using SenseNet.ContentRepository.Storage;
 using SenseNet.ContentRepository.Storage.Data;
 using SenseNet.ContentRepository.Storage.Security;
+using SenseNet.ContentRepository.Tests.Implementations;
 using SenseNet.Search;
 using SenseNet.Search.Indexing;
 using SenseNet.Search.Lucene29;
@@ -23,7 +24,8 @@ namespace SenseNet.SearchImpl.Tests
     [TestClass]
     public class Lucene29Tests : TestBase
     {
-        [TestMethod, TestCategory("IR"), Timeout(20*1000)]
+        [TestMethod, TestCategory("IR, L29")]
+        [Timeout(20 * 1000)]
         public void L29_BasicConditions()
         {
             var result =
@@ -38,7 +40,8 @@ namespace SenseNet.SearchImpl.Tests
             Assert.IsNotNull(indxDir);
         }
 
-        [TestMethod, TestCategory("IR"), Timeout(40*1000)]
+        [TestMethod, TestCategory("IR, L29")]
+        [Timeout(40 * 1000)]
         public void L29_ClearAndPopulateAll()
         {
             var sb = new StringBuilder();
@@ -99,6 +102,7 @@ namespace SenseNet.SearchImpl.Tests
                 .UseAccessProvider(new DesktopAccessProvider())
                 .UseSearchEngine(new Lucene29SearchEngine())
                 .UseSecurityDataProvider(securityDataProvider)
+                .UseCacheProvider(new EmptyCache())
                 .StartWorkflowEngine(false);
 
             repoBuilder.Console = indxManConsole;
