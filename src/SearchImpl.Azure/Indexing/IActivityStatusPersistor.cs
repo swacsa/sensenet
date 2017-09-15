@@ -2,7 +2,7 @@
 
 namespace SenseNet.Search.Azure.Indexing
 {
-    public interface IActivityStatusPersisitor
+    public interface IActivityStatusPersistor
     {
         void PutStatus(IIndexingActivityStatus status);
 

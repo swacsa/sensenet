@@ -34,13 +34,13 @@ namespace SenseNet.Search.Azure.Indexing
 
         private static IDocumentsOperations _documents;
         private static ReaderWriterLockSlim _statusLock = new ReaderWriterLockSlim();
-        private static IActivityStatusPersisitor _status;
+        private static IActivityStatusPersistor _status;
         //private Dictionary<string, List<string>> _customHeaders = null;
 
         //private AzureQueryExecutor _queryExecutor;
         private IIndexingQuery _queryEngine;
 
-        public AzureIndexingEngine(IIndexingQuery queryEngine, IDocumentsOperations documents, IActivityStatusPersisitor status)
+        public AzureIndexingEngine(IIndexingQuery queryEngine, IDocumentsOperations documents, IActivityStatusPersistor status)
         {
             //_queryExecutor = new AzureQueryExecutor(new AzureQueryEngine());
             _queryEngine = queryEngine;
@@ -165,7 +165,16 @@ namespace SenseNet.Search.Azure.Indexing
             _statusLock.EnterReadLock();
             try
             {
-                return _status.GetStatus();
+                var docs =_queryEngine.GetDocuments(new AzureSearchParameters {SearchText = "VersionId:0"});
+                if (docs.Results != null && docs.Results.Count>0)
+                {
+                    var stateField = docs.Results[0].Document["Version"] as string;
+                    var lastId = int.Parse(stateField.Split(';')[0]);
+                    var gaps = stateField.Split(';')[1].Split(',').Select( g => int.Parse(g)).ToArray();
+                    return new IndexingActivityStatus {LastActivityId = lastId, Gaps = gaps};
+                }
+                return null;
+                //return _status.GetStatus();
             }
             finally
             {
@@ -178,7 +187,17 @@ namespace SenseNet.Search.Azure.Indexing
             _statusLock.EnterWriteLock();
             try
             {
-                _status.PutStatus(state);
+                var document = new IndexDocument();
+                var versionIdField = new IndexField(IndexFieldName.VersionId, 0,IndexingMode.NotAnalyzed, IndexStoringMode.No, IndexTermVector.No);
+                var stateField = new IndexField(IndexFieldName.Version, state.LastActivityId+ ";" + string.Join(",", state.Gaps.Select( g => g.ToString())),
+                IndexingMode.NotAnalyzed, IndexStoringMode.No, IndexTermVector.No);
+                document.Add(versionIdField);
+                document.Add(stateField);
+                var action = IndexAction.MergeOrUpload(document);
+                var indexActions = new List<IndexAction<IndexDocument>>();
+                indexActions.Add(action);
+                Index(new IndexBatch<IndexDocument>(indexActions), 1);
+                //_status.PutStatus(state);
             }
             catch (Exception)
             {
@@ -227,10 +246,12 @@ namespace SenseNet.Search.Azure.Indexing
             }
             if (updates != null)
             {
-                indexActions.AddRange(updates.Select(u => IndexAction.Merge(u.Document)));
+                //it needs to be MergeOrUpload because if it is a repeated call for this batch this way it can eliminate inconsistencies
+                indexActions.AddRange(updates.Select(u => IndexAction.MergeOrUpload(u.Document)));
             }
             if (additions != null)
             {
+                //it needs to be MergeOrUpload because if it is a repeated call for this batch this way it can eliminate inconsistencies
                 indexActions.AddRange(additions.Select(IndexAction.MergeOrUpload));
             }
             Index(new IndexBatch<IndexDocument>(indexActions), 1);

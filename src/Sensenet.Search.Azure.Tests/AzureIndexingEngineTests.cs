@@ -85,8 +85,7 @@ namespace Sensenet.Search.Azure.Tests
             mockQueryEngine.Verify(o => o.GetDocuments(It.IsAny<AzureSearchParameters>()), Times.Once);
             mockDocuments.Verify(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)), Times.Once);
             Assert.Equal(1, batch.Actions.Count(a => a.ActionType == IndexActionType.Delete));
-            Assert.Equal(3, batch.Actions.Count(a => a.ActionType == IndexActionType.Merge));
-            Assert.Equal(1, batch.Actions.Count(a => a.ActionType == IndexActionType.MergeOrUpload));
+            Assert.Equal(4, batch.Actions.Count(a => a.ActionType == IndexActionType.MergeOrUpload));
             Assert.Equal("VersionId:12", searchText);
             Assert.Equal("", parameters.Filter);
             Assert.Equal(false, parameters.IncludeTotalResultCount);
@@ -153,8 +152,7 @@ namespace Sensenet.Search.Azure.Tests
             mockQueryEngine.Verify(o => o.GetDocuments(It.IsAny<AzureSearchParameters>()), Times.Once);
             mockDocuments.Verify(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)), Times.Once);
             Assert.Equal(1, batch.Actions.Count(a => a.ActionType == IndexActionType.Delete));
-            Assert.Equal(3, batch.Actions.Count(a => a.ActionType == IndexActionType.Merge));
-            Assert.Equal(1, batch.Actions.Count(a => a.ActionType == IndexActionType.MergeOrUpload));
+            Assert.Equal(4, batch.Actions.Count(a => a.ActionType == IndexActionType.MergeOrUpload));
             Assert.Equal("search.in(VersionId,'2,12,5')", filter);
             Assert.Equal("", searchText);
             Assert.Equal(false, parameters.IncludeTotalResultCount);
@@ -200,7 +198,6 @@ namespace Sensenet.Search.Azure.Tests
                     batch = b;
                 });
 
-            //var queryEngine = new AzureQueryEngine(mockDocuments.Object);
             var mockQueryEngine = new Mock<IIndexingQuery>();
             mockQueryEngine.Setup(o => o.GetDocuments(It.IsAny<AzureSearchParameters>())).Returns(searchResult.Body).Callback((AzureSearchParameters p) =>
             {
@@ -296,8 +293,7 @@ namespace Sensenet.Search.Azure.Tests
             mockQueryEngine.Verify(o => o.GetDocuments(It.IsAny<AzureSearchParameters>()), Times.Once);
             mockDocuments.Verify(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)), Times.Once);
             Assert.Equal(1, batch.Actions.Count(a => a.ActionType == IndexActionType.Delete));
-            Assert.Equal(3, batch.Actions.Count(a => a.ActionType == IndexActionType.Merge));
-            Assert.Equal(1, batch.Actions.Count(a => a.ActionType == IndexActionType.MergeOrUpload));
+            Assert.Equal(4, batch.Actions.Count(a => a.ActionType == IndexActionType.MergeOrUpload));
             Assert.Equal("VersionId:12 Path:/Root/Global NodeId:1345 IsGood:True Created:2017-2-28T02:02:02.777Z", searchText);
             Assert.Equal("", parameters.Filter);
             Assert.Equal(false, parameters.IncludeTotalResultCount);
@@ -310,7 +306,7 @@ namespace Sensenet.Search.Azure.Tests
         {
             string text = null;
             string searchText = null;
-            var batch = new IndexBatch<IndexDocument>[2];// default(IndexBatch<IndexDocument>);
+            var batch = new IndexBatch<IndexDocument>[2];
             SearchParameters parameters = new SearchParameters();
             var mockDocuments = new Mock<IDocumentsOperations>();
             var searchResult = new AzureOperationResponse<DocumentSearchResult>();
@@ -356,7 +352,6 @@ namespace Sensenet.Search.Azure.Tests
                     batch[1] = b;
                 });
 
-            //var queryEngine = new AzureQueryEngine(mockDocuments.Object);
             var mockQueryEngine = new Mock<IIndexingQuery>();
             mockQueryEngine.Setup(o => o.GetDocuments(It.IsAny<AzureSearchParameters>())).Returns(searchResult.Body).Callback((AzureSearchParameters p) =>
             {
@@ -385,11 +380,9 @@ namespace Sensenet.Search.Azure.Tests
             mockQueryEngine.Verify(o => o.GetDocuments(It.IsAny<AzureSearchParameters>()), Times.Once);
             mockDocuments.Verify(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)), Times.Exactly(2));
             Assert.Equal(1, batch[0].Actions.Count(a => a.ActionType == IndexActionType.Delete));
-            Assert.Equal(3, batch[0].Actions.Count(a => a.ActionType == IndexActionType.Merge));
-            Assert.Equal(1, batch[0].Actions.Count(a => a.ActionType == IndexActionType.MergeOrUpload));
+            Assert.Equal(4, batch[0].Actions.Count(a => a.ActionType == IndexActionType.MergeOrUpload));
             Assert.Equal(1, batch[1].Actions.Count(a => a.ActionType == IndexActionType.Delete));
-            Assert.Equal(1, batch[1].Actions.Count(a => a.ActionType == IndexActionType.Merge));
-            Assert.Equal(0, batch[1].Actions.Count(a => a.ActionType == IndexActionType.MergeOrUpload));
+            Assert.Equal(1, batch[1].Actions.Count(a => a.ActionType == IndexActionType.MergeOrUpload));
             Assert.Equal("VersionId:12", searchText);
             Assert.Equal("", parameters.Filter);
             Assert.Equal(false, parameters.IncludeTotalResultCount);
@@ -469,8 +462,7 @@ namespace Sensenet.Search.Azure.Tests
             mockQueryEngine.Verify(o => o.GetDocuments(It.IsAny<AzureSearchParameters>()), Times.Once);
             mockDocuments.Verify(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)), Times.Once);
             Assert.Equal(1, batch.Actions.Count(a => a.ActionType == IndexActionType.Delete));
-            Assert.Equal(3, batch.Actions.Count(a => a.ActionType == IndexActionType.Merge));
-            Assert.Equal(1, batch.Actions.Count(a => a.ActionType == IndexActionType.MergeOrUpload));
+            Assert.Equal(4, batch.Actions.Count(a => a.ActionType == IndexActionType.MergeOrUpload));
             Assert.Equal("VersionId:12", searchText);
             Assert.Equal("", parameters.Filter);
             Assert.Equal(false, parameters.IncludeTotalResultCount);
@@ -481,12 +473,21 @@ namespace Sensenet.Search.Azure.Tests
         [Fact]
         public void ReadActivityStatusFromIndexTest()
         {
-            var mockStatus = new Mock<IActivityStatusPersisitor>();
-            int[] gaps = {1,2};
-            var lastActivity = 3;
-            IIndexingActivityStatus status = new IndexingActivityStatus {LastActivityId = lastActivity, Gaps = gaps};
-            mockStatus.Setup(o => o.GetStatus()).Returns(status);
-            var indexingEngine = new AzureIndexingEngine(null, null, mockStatus.Object);
+            var searchText = "";
+            var searchResult = new AzureOperationResponse<DocumentSearchResult>();
+            searchResult.Body = new DocumentSearchResult();
+            searchResult.Body.Results = new List<SearchResult>();
+            var document = new Document();
+            document.Add("VersionId", "0");
+            document.Add("Version", "3;1,2");
+            searchResult.Body.Results.Add(new SearchResult { Document = document });
+
+            var mockQueryEngine = new Mock<IIndexingQuery>();
+            mockQueryEngine.Setup(o => o.GetDocuments(It.IsAny<AzureSearchParameters>())).Returns(searchResult.Body).Callback((AzureSearchParameters p) =>
+            {
+                searchText = p.SearchText;
+            });
+            var indexingEngine = new AzureIndexingEngine(mockQueryEngine.Object, null, null);
 
             var result = indexingEngine.ReadActivityStatusFromIndex();
 
@@ -499,14 +500,33 @@ namespace Sensenet.Search.Azure.Tests
         [Fact]
         public void WriteActivityStatusToIndexTest()
         {
-            var mockStatus = new Mock<IActivityStatusPersisitor>();
+            var batch = default(IndexBatch<IndexDocument>);
             int[] gaps = { 1, 2 };
             var lastActivity = 3;
             IIndexingActivityStatus status = new IndexingActivityStatus { LastActivityId = lastActivity, Gaps = gaps };
-            mockStatus.Setup(o => o.GetStatus()).Returns(status);
-            var indexingEngine = new AzureIndexingEngine(null, null, mockStatus.Object);
+            var mockDocuments = new Mock<IDocumentsOperations>();
+
+            var indexResult = new AzureOperationResponse<DocumentIndexResult>();
+            var indexingResults = new List<IndexingResult>();
+            indexingResults.Add(new IndexingResult("12", null, true));
+            indexingResults.Add(new IndexingResult("13", null, true));
+            indexingResults.Add(new IndexingResult("0", null, true));
+            indexingResults.Add(new IndexingResult("1", null, true));
+            indexingResults.Add(new IndexingResult("2", null, true));
+            indexResult.Body = new DocumentIndexResult(indexingResults);
+            var indexTask = Task.FromResult(indexResult);
+            mockDocuments.Setup(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken))).Returns(indexTask)
+                .Callback((IndexBatch<IndexDocument> b, SearchRequestOptions o, Dictionary<string, List<string>> c, CancellationToken t) =>
+                {
+                    batch = b;
+                });
+            var indexingEngine = new AzureIndexingEngine(null, mockDocuments.Object, null);
 
             indexingEngine.WriteActivityStatusToIndex(status);
+
+            Assert.Equal(1, batch.Actions.Count(a => a.ActionType == IndexActionType.MergeOrUpload));
+            Assert.Equal(0, batch.Actions.First().Document.VersionId);
+            Assert.Equal("3;1,2", batch.Actions.First().Document.Version);
         }
     }
 }

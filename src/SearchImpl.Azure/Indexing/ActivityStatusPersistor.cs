@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace SenseNet.Search.Azure.Indexing
 {
-    public class ActivityStatusPersisitor : IActivityStatusPersisitor
+    public class ActivityStatusPersistor : IActivityStatusPersistor
     {
         public IIndexingActivityStatus GetStatus()
         {
