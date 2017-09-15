@@ -18,6 +18,19 @@ namespace SenseNet.Search.Parser
             }
         }
 
+        public bool AllVersions
+        {
+            get
+            {
+                throw new NotImplementedException();
+            }
+
+            set
+            {
+                throw new NotImplementedException();
+            }
+        }
+
         public IPerFieldIndexingInfo GetPerFieldIndexingInfo(string fieldName)
         {
             return _indexingInfo[fieldName];
