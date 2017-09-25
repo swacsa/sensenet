@@ -120,37 +120,29 @@ namespace SenseNet.Search.Azure.Indexing
         #region IIndexingEngine
 
         public bool Running { get; private set; }
-        public bool Paused { get; private set; }
+        //public bool Paused { get; private set; }
 
-        public void Pause()
-        {
-            Paused = true;
-        }
+        //public void Pause()
+        //{
+        //    Paused = true;
+        //}
 
-        public void Continue()
-        {
-            Paused = false;
-        }
+        //public void Continue()
+        //{
+        //    Paused = false;
+        //}
 
         public void Start(TextWriter consoleOut)
         {
             Running = true;
         }
 
-        public void WaitIfIndexingPaused()
-        {
-
-        }
 
         public void ShutDown()
         {
             Running = false;
         }
 
-        public void Restart()
-        {
-            Running = true;
-        }
 
         public void ActivityFinished()
         {
@@ -207,9 +199,51 @@ namespace SenseNet.Search.Azure.Indexing
         }
         public IEnumerable<IndexDocument> GetDocumentsByNodeId(int nodeId)
         {
-            throw new NotImplementedException();
+            var nodes = new [] { new SnTerm(IndexFieldName.NodeId, nodeId)};
+            string filter;
+            var searchText = GetFilterCondition(nodes, out filter);
+            AzureSearchParameters queryParameters = new AzureSearchParameters { SearchText = searchText, Filter = filter };
+            var docs = _queryEngine.GetDocuments(queryParameters).Results.Select(r => r.Document).ToArray();
+            var documents = new List<IndexDocument>();
+            foreach (var doc in docs)
+            {
+                documents.Add(GetIndexDocument(doc));
+            }
+            return documents;
         }
 
+        private IndexDocument GetIndexDocument(Document doc)
+        {
+            var document = new IndexDocument();
+            foreach (var key in doc.Keys)
+            {
+                if (doc[key] is bool)
+                {
+                    document.Add(new IndexField(key, bool.Parse(doc[key].ToString()), IndexingMode.NotAnalyzed, IndexStoringMode.No, IndexTermVector.No));
+                }
+                if (doc[key] is int)
+                {
+                    document.Add(new IndexField(key, int.Parse(doc[key].ToString()), IndexingMode.NotAnalyzed, IndexStoringMode.No, IndexTermVector.No));
+                }
+                if (doc[key] is long)
+                {
+                    document.Add(new IndexField(key, long.Parse(doc[key].ToString()), IndexingMode.NotAnalyzed, IndexStoringMode.No, IndexTermVector.No));
+                }
+                if (doc[key] is float)
+                {
+                    document.Add(new IndexField(key, float.Parse(doc[key].ToString()), IndexingMode.NotAnalyzed, IndexStoringMode.No, IndexTermVector.No));
+                }
+                if (doc[key] is double)
+                {
+                    document.Add(new IndexField(key, double.Parse(doc[key].ToString()), IndexingMode.NotAnalyzed, IndexStoringMode.No, IndexTermVector.No));
+                }
+                if (doc[key] is DateTime)
+                {
+                    document.Add(new IndexField(key, DateTime.Parse(doc[key].ToString()), IndexingMode.NotAnalyzed, IndexStoringMode.No, IndexTermVector.No));
+                }
+            }
+            return document;
+        }
         public void WriteIndex(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates)
         {
             Actualize(deletions, addition == null ? null : new [] {addition}, updates);
