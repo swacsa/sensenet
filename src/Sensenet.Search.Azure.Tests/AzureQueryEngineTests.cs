@@ -66,8 +66,8 @@ namespace Sensenet.Search.Azure.Tests
             mockContext.SetupGet(o => o.Settings).Returns(settings);
             mockContext.SetupGet(o => o.UserId).Returns(1);
             mockContext.Setup(o => o.GetPerFieldIndexingInfo(It.IsAny<string>())).Returns((IPerFieldIndexingInfo)null);
-            IPermissionFilterFactory permissionFilterFactory = new DefaultPermissionFilterFactory();
-            var permissionFilter = permissionFilterFactory.Create(mockContext.Object.UserId);
+            var mockPermissionFilter = new Mock<IPermissionFilter>();
+            mockPermissionFilter.Setup(o => o.IsPermitted(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<bool>())).Returns(true);
             var mockCompiler = new Mock<IQueryCompiler>();
             var searchParameters = new AzureSearchParameters();
             mockCompiler.Setup(o => o.Compile(It.IsAny<SnQuery>(), It.IsAny<IQueryContext>())).Returns(searchParameters);
@@ -78,7 +78,7 @@ namespace Sensenet.Search.Azure.Tests
             IDictionary<string, IPerFieldIndexingInfo> indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>();
             IQueryContext context = new QueryContext(QuerySettings.Default, 0, indexingInfo);
 
-            var result = engine.ExecuteQuery(query, permissionFilter, context);
+            var result = engine.ExecuteQuery(query, mockPermissionFilter.Object, context);
 
             Assert.Equal(1,result.Hits.Count());
             Assert.Equal(1, result.TotalCount);

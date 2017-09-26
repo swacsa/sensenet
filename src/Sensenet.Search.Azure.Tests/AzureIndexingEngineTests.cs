@@ -9,6 +9,7 @@ using Microsoft.Rest.Azure;
 using Moq;
 using SenseNet.Search;
 using SenseNet.Search.Azure.Indexing;
+using SenseNet.Search.Azure.Managing;
 using SenseNet.Search.Azure.Querying;
 using SenseNet.Search.Azure.Querying.Models;
 using Xunit;
@@ -528,5 +529,64 @@ namespace Sensenet.Search.Azure.Tests
             Assert.Equal(0, batch.Actions.First().Document.VersionId);
             Assert.Equal("3;1,2", batch.Actions.First().Document.Version);
         }
+
+        [Fact]
+        public void ClearIndexTest()
+        {
+            var mockManager = new Mock<IIndexManager>();
+            mockManager.Setup(o => o.DemolishSearchEnvironment()).Returns(true);
+            mockManager.Setup(o => o.BuildSearchEnvironment()).Returns(true);
+            var indexingEngine = new AzureIndexingEngine(null, null, mockManager.Object);
+
+            indexingEngine.ClearIndex();
+
+            mockManager.Verify(o => o.DemolishSearchEnvironment(), Times.Once);
+            mockManager.Verify(o => o.BuildSearchEnvironment(), Times.Once);
+        }
+
+        [Fact]
+        public void ClearIndexWithDemolishErrorTest()
+        {
+            var mockManager = new Mock<IIndexManager>();
+            mockManager.Setup(o => o.DemolishSearchEnvironment()).Returns(false);
+            mockManager.Setup(o => o.BuildSearchEnvironment()).Returns(true);
+            var indexingEngine = new AzureIndexingEngine(null, null, mockManager.Object);
+
+            try
+            {
+                indexingEngine.ClearIndex();
+            }
+            catch (Exception ex)
+            {
+                Assert.True(ex is ApplicationException);
+                Assert.Equal("DemolishSearchEnvironment() failed to run flawlessly.", ex.Message);
+            }
+
+            mockManager.Verify(o => o.DemolishSearchEnvironment(), Times.Once);
+            mockManager.Verify(o => o.BuildSearchEnvironment(), Times.Never);
+        }
+
+        [Fact]
+        public void ClearIndexWithBuildErrorTest()
+        {
+            var mockManager = new Mock<IIndexManager>();
+            mockManager.Setup(o => o.DemolishSearchEnvironment()).Returns(true);
+            mockManager.Setup(o => o.BuildSearchEnvironment()).Returns(false);
+            var indexingEngine = new AzureIndexingEngine(null, null, mockManager.Object);
+
+            try
+            {
+                indexingEngine.ClearIndex();
+            }
+            catch (Exception ex)
+            {
+                Assert.True(ex is ApplicationException);
+                Assert.Equal("BuildSearchEnvironment() failed to run flawlessly.", ex.Message);
+            }
+
+            mockManager.Verify(o => o.DemolishSearchEnvironment(), Times.Once);
+            mockManager.Verify(o => o.BuildSearchEnvironment(), Times.Once);
+        }
+
     }
 }

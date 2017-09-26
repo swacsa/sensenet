@@ -31,6 +31,14 @@ namespace SenseNet.Search.Parser
             }
         }
 
+        public IMetaQueryEngine MetaQueryEngine
+        {
+            get
+            {
+                throw new NotImplementedException();
+            }
+        }
+
         public IPerFieldIndexingInfo GetPerFieldIndexingInfo(string fieldName)
         {
             return _indexingInfo[fieldName];

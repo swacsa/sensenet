@@ -81,7 +81,7 @@ namespace Sensenet.Search.Azure.Tests
 
             q = Test("F1:V1 .TOP:42", "F1:V1"); Assert.Equal(42, q.Top);
             q = Test("F1:V1 .SKIP:42", "F1:V1"); Assert.Equal(42, q.Skip);
-            q = Test("F1:V1 .COUNTONLY", "F1:V1"); Assert.Equal(true, q.IncludeTotalResultCount && q.Top == int.MaxValue);
+            q = Test("F1:V1 .COUNTONLY", "F1:V1"); Assert.Equal(true, q.IncludeTotalResultCount && q.Top == 0);
             q = Test("F1:V1 .AUTOFILTERS:ON", "F1:V1"); Assert.True(q.EnableAutofilters);
             q = Test("F1:V1 .AUTOFILTERS:OFF", "F1:V1"); Assert.False(q.EnableAutofilters);
             q = Test("F1:V1 .LIFESPAN:ON", "F1:V1"); Assert.True(q.EnableLifespanFilter);

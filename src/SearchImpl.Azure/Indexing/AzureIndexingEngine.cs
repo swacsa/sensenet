@@ -14,6 +14,7 @@ using SenseNet.Search.Indexing;
 using IndexBatch = Microsoft.Azure.Search.Models.IndexBatch;
 using SenseNet.Portal.Virtualization;
 using SenseNet.ContentRepository.Storage.Security;
+using SenseNet.Search.Azure.Managing;
 
 namespace SenseNet.Search.Azure.Indexing
 {
@@ -33,24 +34,26 @@ namespace SenseNet.Search.Azure.Indexing
         private static ISearchIndexClient _indexClient;
 
         private static IDocumentsOperations _documents;
+        private IIndexManager _manager { get; set; }
         private static ReaderWriterLockSlim _statusLock = new ReaderWriterLockSlim();
-        private static IActivityStatusPersistor _status;
+        //private static IActivityStatusPersistor _status;
         //private Dictionary<string, List<string>> _customHeaders = null;
 
         //private AzureQueryExecutor _queryExecutor;
         private IIndexingQuery _queryEngine;
 
-        public AzureIndexingEngine(IIndexingQuery queryEngine, IDocumentsOperations documents, IActivityStatusPersistor status)
+        public AzureIndexingEngine(IIndexingQuery queryEngine, IDocumentsOperations documents, IIndexManager manager)//, IActivityStatusPersistor status)
         {
             //_queryExecutor = new AzureQueryExecutor(new AzureQueryEngine());
             _queryEngine = queryEngine;
-            _status = status;
+            //_status = status;
             //_credentials = new SearchCredentials(_apiKey);
             //_indexClient = new SearchIndexClient(_serviceName, _indexName, _credentials);
             //_indexClient.BaseUri = new Uri(_schema + _serviceName + "." + _dnsSuffix + _indexName);
             //_indexClient.LongRunningOperationRetryTimeout = _operationTimeout;
             //_documents = _indexClient.Documents;
             _documents = documents;
+            _manager = manager;
         }
 
         #region Azure calls
@@ -120,17 +123,6 @@ namespace SenseNet.Search.Azure.Indexing
         #region IIndexingEngine
 
         public bool Running { get; private set; }
-        //public bool Paused { get; private set; }
-
-        //public void Pause()
-        //{
-        //    Paused = true;
-        //}
-
-        //public void Continue()
-        //{
-        //    Paused = false;
-        //}
 
         public void Start(TextWriter consoleOut)
         {
@@ -180,9 +172,11 @@ namespace SenseNet.Search.Azure.Indexing
             try
             {
                 var document = new IndexDocument();
-                var versionIdField = new IndexField(IndexFieldName.VersionId, 0,IndexingMode.NotAnalyzed, IndexStoringMode.No, IndexTermVector.No);
-                var stateField = new IndexField(IndexFieldName.Version, state.LastActivityId+ ";" + string.Join(",", state.Gaps.Select( g => g.ToString())),
-                IndexingMode.NotAnalyzed, IndexStoringMode.No, IndexTermVector.No);
+                var versionIdField = new IndexField(IndexFieldName.VersionId, 0, IndexingMode.NotAnalyzed,
+                    IndexStoringMode.No, IndexTermVector.No);
+                var stateField = new IndexField(IndexFieldName.Version,
+                    state.LastActivityId + ";" + string.Join(",", state.Gaps.Select(g => g.ToString())),
+                    IndexingMode.NotAnalyzed, IndexStoringMode.No, IndexTermVector.No);
                 document.Add(versionIdField);
                 document.Add(stateField);
                 var action = IndexAction.MergeOrUpload(document);
@@ -191,10 +185,9 @@ namespace SenseNet.Search.Azure.Indexing
                 Index(new IndexBatch<IndexDocument>(indexActions), 1);
                 //_status.PutStatus(state);
             }
-            catch (Exception)
+            finally
             {
                 _statusLock.ExitWriteLock();
-                throw;
             }
         }
         public IEnumerable<IndexDocument> GetDocumentsByNodeId(int nodeId)
@@ -244,10 +237,12 @@ namespace SenseNet.Search.Azure.Indexing
             }
             return document;
         }
+
         public void WriteIndex(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates)
         {
             Actualize(deletions, addition == null ? null : new [] {addition}, updates);
         }
+
         public void WriteIndex(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> additions)
         {
             Actualize(deletions, additions, null);
@@ -255,7 +250,22 @@ namespace SenseNet.Search.Azure.Indexing
 
         public void ClearIndex()
         {
-            throw new NotImplementedException();
+            _statusLock.EnterWriteLock();
+            try
+            {
+                if (!_manager.DemolishSearchEnvironment())
+                {
+                    throw new ApplicationException("DemolishSearchEnvironment() failed to run flawlessly.");
+                }
+                if (!_manager.BuildSearchEnvironment())
+                {
+                    throw new ApplicationException("BuildSearchEnvironment() failed to run flawlessly.");
+                }
+            }
+            finally
+            {
+                _statusLock.ExitWriteLock();
+            }
         }
 
         private void Actualize(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> additions, IEnumerable<DocumentUpdate> updates) 

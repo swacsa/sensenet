@@ -9,10 +9,10 @@ namespace SenseNet.Search.Azure.Querying
 {
     public class AzureQueryExecutor //:IQueryExecutor
     {
-        private PermissionChecker _permissionChecker;
+        private IPermissionFilter _permissionChecker;
         private AzureSearchParameters _queryParameters;
         public AzureSearchParameters QueryParameters => _queryParameters;
-        public PermissionChecker PermissionChecker => _permissionChecker;
+        public IPermissionFilter PermissionChecker => _permissionChecker;
 
         private IIndexingQuery _queryEngine;
 
@@ -33,7 +33,7 @@ namespace SenseNet.Search.Azure.Querying
             return null; //documents;
         }
 
-        public void Initialize(AzureSearchParameters queryParameters, PermissionChecker permisionChecker)
+        public void Initialize(AzureSearchParameters queryParameters, IPermissionFilter permisionChecker)
         {
             _queryParameters = queryParameters;
             _permissionChecker = permisionChecker;

@@ -32,35 +32,30 @@ namespace SenseNet.Search.Azure.Managing
         private Index _index;
         private Indexer _indexer;
         private DataContainer _container;
-        private IList<Field> _fields = new List<Field>()
-        {
-            new Field { IsKey = true, IsFilterable = true , IsSortable = true, IsRetrievable =true, Type = DataType.String, Name = "Id"}
-            , new Field { IsFilterable = true , IsSortable = true, IsRetrievable =true, Type = DataType.Int32, Name = "NodeId"}
-            , new Field { IsFilterable = true , IsSortable = true, IsRetrievable =true, Type = DataType.String, Name = "Type", IsFacetable = true}
-            , new Field { IsSearchable = true, IsFilterable = true , IsSortable = true, IsRetrievable =true, Type = DataType.String, Name = "Name"}
-            , new Field { IsSearchable = true, IsFilterable = true , IsSortable = true, IsRetrievable =true, Type = DataType.String, Name = "Path", IsFacetable = true}
-            , new Field { IsFilterable = true , IsSortable = true, IsRetrievable =true, Type = DataType.String, Name = "Version", IsFacetable = true}
-        };
 
         //private Dictionary<string, List<string>> _customHeaders = null;
 
-        public AzureIndexManager()
+        public AzureIndexManager(IDataSourcesOperations dataSources, IIndexersOperations indexers,  IIndexesOperations indices)
         {
-            if (_searchCredentials == null)
-            {
-                _index = new Index(_indexName, _fields);
-                _datasourceCredentials = new DataSourceCredentials(_datasourceConnectionString);
-                _container = new DataContainer(_viewName);
-                _dataSource = new DataSource(_dataSourceName, DataSourceType.AzureSql, _datasourceCredentials, _container);
-                _indexer = new Indexer(_indexerName, _dataSourceName, _indexName);
-                _searchCredentials = new SearchCredentials(_apiKey);
-                _serviceClient = new SearchServiceClient(_serviceName, _searchCredentials);
-                _serviceClient.BaseUri = new Uri(_schema + _serviceName + "." + _dnsSuffix); ;
-                _serviceClient.LongRunningOperationRetryTimeout = _operationTimeout;
-                _indices = _serviceClient.Indexes;
-                _dataSources = _serviceClient.DataSources;
-                _indexers = _serviceClient.Indexers;
-            }
+            //if (_searchCredentials == null)
+            //{
+            //_index = new Index(_indexName, _fields);
+            //_datasourceCredentials = new DataSourceCredentials(_datasourceConnectionString);
+            //_container = new DataContainer(_viewName);
+            //_dataSource = new DataSource(_dataSourceName, DataSourceType.AzureSql, _datasourceCredentials, _container);
+            //_indexer = new Indexer(_indexerName, _dataSourceName, _indexName);
+            //_searchCredentials = new SearchCredentials(_apiKey);
+            //_serviceClient = new SearchServiceClient(_serviceName, _searchCredentials);
+            //_serviceClient.BaseUri = new Uri(_schema + _serviceName + "." + _dnsSuffix); ;
+            //_serviceClient.LongRunningOperationRetryTimeout = _operationTimeout;
+            //_indices = _serviceClient.Indexes;
+            //_dataSources = _serviceClient.DataSources;
+            //_indexers = _serviceClient.Indexers;
+        //}
+
+            _dataSources = dataSources;
+            _indexers = indexers;
+            _indices = indices;
         }
 
         public bool BuildSearchEnvironment()
