@@ -11,7 +11,9 @@ namespace SenseNet.Search
         QuerySettings Settings { get; }
         int UserId { get; }
         IQueryEngine QueryEngine { get; }
-        bool AllVersions { get; set; } //UNDONE: Move or not to QuerySettings.
+        IMetaQueryEngine MetaQueryEngine { get; }
+
+        bool AllVersions { get; set; } //UNDONE:!!!!! tusmester API: TEST: AllVersions: Move to QuerySettings.
 
         IPerFieldIndexingInfo GetPerFieldIndexingInfo(string fieldName);
     }

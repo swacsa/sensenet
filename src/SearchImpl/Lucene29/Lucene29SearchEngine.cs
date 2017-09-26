@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using SenseNet.ContentRepository.Storage;
 using SenseNet.ContentRepository.Storage.Search;
 using SenseNet.Search.Indexing;
-using SenseNet.Search.Lucene29;
 using SenseNet.Tools;
 
 namespace SenseNet.Search.Lucene29
@@ -13,9 +11,7 @@ namespace SenseNet.Search.Lucene29
     {
         public static readonly Lucene.Net.Util.Version LuceneVersion = Lucene.Net.Util.Version.LUCENE_29;
 
-        readonly Lucene29QueryEngine _queryEngineInstance = new Lucene29QueryEngine();
-
-        public IIndexingEngine IndexingEngine { get; } = new Lucene29IndexingEngine();
+        public IIndexingEngine IndexingEngine { get; internal set; } = new Lucene29IndexingEngine();
 
         public IQueryEngine QueryEngine { get; } = new Lucene29QueryEngine();
 
@@ -28,25 +24,11 @@ namespace SenseNet.Search.Lucene29
         {
             return new DocumentPopulator();
         }
-        public IEnumerable<int> Execute(string lucQuery)
-        {
-            var query = LucQuery.Parse(lucQuery);
-            var lucObjects = query.Execute();
-            return from lucObject in lucObjects select lucObject.NodeId;
-        }
 
         private IDictionary<string, Type> _analyzers = new Dictionary<string, Type>();
         public IDictionary<string, Type> GetAnalyzers()
         {
             return _analyzers;
-        }
-
-        internal static IEnumerable<LucObject> GetAllDocumentVersionsByNodeId(int nodeId)
-        {
-            var queryText = String.Concat(IndexFieldName.NodeId, ":", nodeId, " .AUTOFILTERS:OFF");
-            var query = LucQuery.Parse(queryText);
-            var result = query.Execute(true);
-            return result;
         }
 
         public void SetIndexingInfo(object indexingInfo)

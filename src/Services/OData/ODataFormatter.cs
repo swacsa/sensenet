@@ -151,7 +151,7 @@ namespace SenseNet.Portal.OData
             var chdef = content.ChildrenDefinition;
             if (req.HasContentQuery)
             {
-                chdef.ContentQuery = ContentQuery_NEW.AddClause(req.ContentQueryText, String.Concat("InTree:'", path, "'"), ChainOperator.And);
+                chdef.ContentQuery = ContentQuery.AddClause(req.ContentQueryText, String.Concat("InTree:'", path, "'"), ChainOperator.And);
 
                 if (req.AutofiltersEnabled != FilterStatus.Default)
                     chdef.EnableAutofilters = req.AutofiltersEnabled;
@@ -171,7 +171,7 @@ namespace SenseNet.Portal.OData
                 chdef.EnableAutofilters = FilterStatus.Disabled;
                 if (string.IsNullOrEmpty(chdef.ContentQuery))
                 {
-                    chdef.ContentQuery = ContentQuery_NEW.AddClause(chdef.ContentQuery, String.Concat("InFolder:'", path, "'"), ChainOperator.And);
+                    chdef.ContentQuery = ContentQuery.AddClause(chdef.ContentQuery, String.Concat("InFolder:'", path, "'"), ChainOperator.And);
                 }
             }
 
@@ -522,7 +522,7 @@ new StackInfo
             if (cdef.QueryExecutionMode != QueryExecutionMode.Default)
                 lucQuery.QueryExecutionMode = cdef.QueryExecutionMode;
 
-            var result = lucQuery.Execute();
+            var result = lucQuery.Execute(); //UNDONE:!!! LINQ: Use SnQuery instead of LucQuery
             var idResult = result.Select(x => x.NodeId);
             // for optimization purposes this combined condition is examined separately
             if (req.InlineCount == InlineCount.AllPages && req.CountOnly)

@@ -164,11 +164,12 @@ namespace SenseNet.Search.Lucene29
             }
         }
 
-        public bool Running { get; private set; }
+        public bool Running { get; internal set; }
+        internal IndexDirectory IndexDirectory { get; }
 
-        public Lucene29IndexingEngine()
+        public Lucene29IndexingEngine(IndexDirectory indexDirectory = null)
         {
-            
+            IndexDirectory = indexDirectory ?? new IndexDirectory();
         }
         public Lucene29IndexingEngine(TimeSpan forceReopenFrequency)
         {
@@ -190,7 +191,7 @@ namespace SenseNet.Search.Lucene29
                 }
             }
         }
-        private void Startup(System.IO.TextWriter consoleOut)
+        protected virtual void Startup(TextWriter consoleOut)
         {
             WaitForWriterLockFileIsReleased(WaitForLockFileType.OnStart);
 
@@ -213,31 +214,20 @@ namespace SenseNet.Search.Lucene29
 
             Warmup();
 
-            var commitStart = new ThreadStart(CommitWorker);
-            var t = new Thread(commitStart);
-            t.Start();
-
-            SnTrace.Index.Write("LM: 'CommitWorker' thread started. ManagedThreadId: {0}", t.ManagedThreadId);
-
             IndexHealthMonitor.Start(consoleOut);
         }
 
         private void Warmup()
         {
-            var result = ContentQuery_NEW.Query(SafeQueriesInternal.ContentById, QuerySettings.AdminSettings, 1);
+            var result = ContentQuery.Query(SafeQueriesInternal.ContentById, QuerySettings.AdminSettings, 1);
         }
 
         public void ShutDown()
         {
-            if (!Running)
-                return;
-
             using (var op = SnTrace.Index.StartOperation("LUCENEMANAGER SHUTDOWN"))
             {
                 if (_writer != null)
                 {
-                    _stopCommitWorker = true;
-
                     lock (_commitLock)
                         Commit(false);
 
@@ -248,6 +238,9 @@ namespace SenseNet.Search.Lucene29
                             _reader?.Close();
                             _writer?.Close();
                             Running = false;
+                            
+                            _writer = null;
+                            _reader = null;
                         }
                         op2.Successful = true;
                     }
@@ -261,26 +254,12 @@ namespace SenseNet.Search.Lucene29
             }
         }
 
-        public void ActivityFinished()
-        {
-            // compiler warning here is not a problem, Interlocked 
-            // class can work with a volatile variable
-#pragma warning disable 420
-            Interlocked.Increment(ref _activities);
-#pragma warning restore 420
-        }
-
-        public void Commit(int lastActivityId = 0)
-        {
-            Commit(false);
-        }
-
         public void ClearIndex()
         {
             _reader?.Close();
             _writer?.Close();
 
-            var dir = FSDirectory.Open(new System.IO.DirectoryInfo(IndexDirectory.CurrentOrDefaultDirectory));
+            var dir = FSDirectory.Open(new System.IO.DirectoryInfo(IndexDirectory.CurrentDirectory));
             var writer = new IndexWriter(dir, GetAnalyzer(), true, IndexWriter.MaxFieldLength.UNLIMITED);
             writer.Commit();
             writer.Close();
@@ -296,9 +275,9 @@ namespace SenseNet.Search.Lucene29
             }
         }
 
-        public void WriteActivityStatusToIndex(IIndexingActivityStatus state) //UNDONE:!!!!! Finalize/Validate this method (not called)
+        public void WriteActivityStatusToIndex(IIndexingActivityStatus state) //UNDONE:!!!!! API COMMIT: Review and write unit tests.
         {
-            throw new NotImplementedException();
+            Commit(true, state);
         }
 
         /* =========================================================================================== Lock file operationss */
@@ -317,7 +296,7 @@ namespace SenseNet.Search.Lucene29
         /// If timeout is exceeded an error is logged and execution continues. For errors at OnStart an email is also sent to a configured address.
         /// </summary>
         /// <param name="waitType">A parameter that influences the logged error message and email template only.</param>
-        public static void WaitForWriterLockFileIsReleased(WaitForLockFileType waitType)
+        public void WaitForWriterLockFileIsReleased(WaitForLockFileType waitType)
         {
             // check if writer.lock is still there -> if yes, wait for other appdomain to quit or lock to disappear - until a given timeout.
             // after timeout is passed, Repository.Start will deliberately attempt to remove lock file on following startup
@@ -369,7 +348,7 @@ namespace SenseNet.Search.Lucene29
         /// Returns true if the lock was released. Returns false if the time has expired.
         /// </summary>
         /// <returns>Returns true if the lock was released. Returns false if the time has expired.</returns>
-        public static bool WaitForWriterLockFileIsReleased()
+        public bool WaitForWriterLockFileIsReleased()
         {
             return WaitForWriterLockFileIsReleased(IndexDirectory.CurrentDirectory);
         }
@@ -426,7 +405,7 @@ namespace SenseNet.Search.Lucene29
             if (lockFilePath == null)
                 return;
 
-            consoleOut.WriteLine($"Index: {IndexDirectory.CurrentOrDefaultDirectory}");
+            consoleOut.WriteLine($"Index directory: {IndexDirectory.CurrentDirectory}");
 
             if (System.IO.File.Exists(lockFilePath))
             {
@@ -603,14 +582,13 @@ namespace SenseNet.Search.Lucene29
 
         /* ============================================================================================= */
 
-        private void Commit(bool reopenReader)
+        private void Commit(bool reopenReader, IIndexingActivityStatus state = null)
         {
-            CompletionState commitState;
             using (var op = SnTrace.Index.StartOperation("LM: Commit. reopenReader:{0}", reopenReader))
             {
                 using (var wrFrame = IndexWriterFrame.Get(!reopenReader)) // // Commit
                 {
-                    commitState = CompletionState.GetCurrent();
+                    var commitState = state ?? CompletionState.GetCurrent();
                     var commitStateMessage = commitState.ToString();
 
                     SnTrace.Index.Write("LM: Committing_writer. commitState: " + commitStateMessage);
@@ -623,11 +601,6 @@ namespace SenseNet.Search.Lucene29
                     if (reopenReader)
                         ReopenReader();
                 }
-
-#pragma warning disable 420
-                Interlocked.Exchange(ref _activities, 0);
-#pragma warning restore 420
-                _delayCycle = 0;
 
                 op.Successful = true;
             }
@@ -678,8 +651,6 @@ namespace SenseNet.Search.Lucene29
         private ReaderWriterLockSlim _writerRestartLock = new ReaderWriterLockSlim();
 
         private readonly ManualResetEventSlim _indexingSemaphore = new ManualResetEventSlim(true);
-        private volatile int _delayCycle;          // committer thread uses
-        private volatile int _activities;          // committer thread sets 0 other threads increment
         private volatile int _recentlyUsedReaderFrames;
 
         private TimeSpan _forceReopenFrequency;
@@ -727,7 +698,7 @@ namespace SenseNet.Search.Lucene29
             // new IndexWriter(createNew = false) cannot be created if the directory is empty
             if (System.IO.Directory.GetFiles(path).Any())
                 return;
-            var dir = FSDirectory.Open(new System.IO.DirectoryInfo(IndexDirectory.CurrentOrDefaultDirectory));
+            var dir = FSDirectory.Open(new System.IO.DirectoryInfo(IndexDirectory.CurrentDirectory));
             var writer = new IndexWriter(dir, GetAnalyzer(), true, IndexWriter.MaxFieldLength.UNLIMITED);
             writer.Commit();
             writer.Close();
@@ -750,79 +721,7 @@ namespace SenseNet.Search.Lucene29
             return doc;
         }
 
-        internal void CommitOrDelay()
-        {
-            var act = _activities;
-            if (act == 0 && _delayCycle == 0)
-                return;
-
-            if (act < 2)
-            {
-                Commit();
-            }
-            else
-            {
-                _delayCycle++;
-                if (_delayCycle > SenseNet.Configuration.Indexing.DelayedCommitCycleMaxCount)
-                {
-                    Commit();
-                }
-            }
-
-#pragma warning disable 420
-            Interlocked.Exchange(ref _activities, 0);
-#pragma warning restore 420
-        }
-
-        private bool _stopCommitWorker;
         private object _commitLock = new object();
-        private void CommitWorker()
-        {
-            int wait = (int)(SenseNet.Configuration.Indexing.CommitDelayInSeconds * 1000.0);
-            for (;;)
-            {
-                // check if commit worker instructed to stop
-                if (_stopCommitWorker)
-                {
-                    _stopCommitWorker = false;
-                    return;
-                }
-
-                try
-                {
-                    lock (_commitLock)
-                    {
-                        CommitOrDelay();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    SnLog.WriteException(ex);
-                }
-                Thread.Sleep(wait);
-            }
-        }
-
-        /* ================================================================== Tools */
-
-        /// <summary> For test purposes. </summary>
-        public IEnumerable<IndexDocument> GetDocumentsByNodeId(int nodeId)
-        {
-            using (var readerFrame = GetIndexReaderFrame())
-            {
-                var termDocs = readerFrame.IndexReader.TermDocs(new Term(IndexFieldName.NodeId, Lucene.Net.Util.NumericUtils.IntToPrefixCoded(nodeId)));
-                return GetDocumentsFromTermDocs(termDocs, readerFrame);
-            }
-        }
-        private IEnumerable<IndexDocument> GetDocumentsFromTermDocs(TermDocs termDocs, IndexReaderFrame readerFrame)
-        {
-            throw new NotImplementedException();
-            //var docs = new List<IIndexDocument>();
-            //while (termDocs.Next())
-            //    docs.Add(new Lucene29IndexDocument(readerFrame.IndexReader.Document(termDocs.Doc())));
-            //docs.Sort(new DocumentVersionComparer());
-            //return docs;
-        }
 
     }
 }

@@ -489,7 +489,7 @@ namespace SenseNet.ContentRepository
 
             // Find all settings that inherit from this setting and remove their cached data
 
-            if (RepositoryInstance.LuceneManagerIsRunning && !RepositoryEnvironment.WorkingMode.Importing)
+            if (RepositoryInstance.IndexingEngineIsRunning && !RepositoryEnvironment.WorkingMode.Importing)
             {
                 string contextPath = null;
 
@@ -501,7 +501,7 @@ namespace SenseNet.ContentRepository
 
                 using (new SystemAccount())
                 {
-                    var q = ContentQuery_NEW.Query(SafeQueries.InTreeAndTypeIsAndName,
+                    var q = ContentQuery.Query(SafeQueries.InTreeAndTypeIsAndName,
                          new QuerySettings { EnableAutofilters = FilterStatus.Disabled },
                          contextPath, typeof(Settings).Name, this.Name);
                     foreach (var id in q.Identifiers)
@@ -564,20 +564,20 @@ namespace SenseNet.ContentRepository
             var globalSettingError = false;
             if (StorageContext.Search.ContentQueryIsAllowed)
             {
-                if (ContentQuery_NEW.Query(SafeQueries.SettingsByNameAndSubtree, null, name, id, rootpath).Count > 0)
+                if (ContentQuery.Query(SafeQueries.SettingsByNameAndSubtree, null, name, id, rootpath).Count > 0)
                     nameError = true;
 
                 // check global settings only if this is a local setting
                 if (!nameError &&
                     !path.StartsWith(SETTINGSCONTAINERPATH + RepositoryPath.PathSeparator, StringComparison.InvariantCulture) &&
-                    ContentQuery_NEW.Query(SafeQueries.SettingsGlobalOnly, null, name, SETTINGSCONTAINERPATH).Count > 0)
+                    ContentQuery.Query(SafeQueries.SettingsGlobalOnly, null, name, SETTINGSCONTAINERPATH).Count > 0)
                     globalSettingError = true;
             }
             else
             {
                 var settingsType = ActiveSchema.NodeTypes["Settings"];
 
-                // query content without Lucene
+                // query content without outer search engine
                 var nqResult = NodeQuery.QueryNodesByTypeAndPathAndName(settingsType, false, rootpath, false, name);
                 if (nqResult.Nodes.Any(n => n.Id != id))
                     nameError = true;

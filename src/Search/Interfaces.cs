@@ -24,7 +24,7 @@ namespace SenseNet.Search
         bool Compile(IQueryCompilerValue value);
 
         /// <summary>For SnLucParser</summary>
-        [Obsolete("", false)]//UNDONE:!! do not use in parser
+        [Obsolete("", false)]//UNDONE:!! After LINQ: do not use in parser
         bool TryParseAndSet(IQueryFieldValue value);
         /// <summary>For LINQ</summary>
         void ConvertToTermValue(IQueryFieldValue value);
@@ -38,7 +38,7 @@ namespace SenseNet.Search
 
         IEnumerable<IndexField> GetIndexFields(ISnField field, out string textExtract);
     }
-    public interface IPerFieldIndexingInfo //UNDONE: Racionalize interface names: IPerFieldIndexingInfo
+    public interface IPerFieldIndexingInfo //UNDONE: REFACTOR: Racionalize interface names: IPerFieldIndexingInfo
     {
         string Analyzer { get; set; }
         IFieldIndexHandler IndexFieldHandler { get; set; }
@@ -54,7 +54,7 @@ namespace SenseNet.Search
 
     public enum QueryFieldLevel { NotDefined = 0, HeadOnly = 1, NoBinaryOrFullText = 2, BinaryOrFullText = 3 }
 
-    public interface IQueryFieldValue //UNDONE:!! do not use in parser / compiler
+    public interface IQueryFieldValue //UNDONE:!! After LINQ: do not use in parser / compiler
     {
         //internal bool IsPhrase { get; }
         //internal SnLucLexer.Token Token { get; }
@@ -76,7 +76,7 @@ namespace SenseNet.Search
     }
 
 
-    public class QueryFieldValue : IQueryFieldValue  //UNDONE:!! do not use in parser / compiler
+    public class QueryFieldValue : IQueryFieldValue  //UNDONE:!! After LINQ: do not use in parser / compiler
     {
         internal bool IsPhrase { get; private set; }
         internal CqlLexer.Token Token { get; private set; }
@@ -199,49 +199,103 @@ namespace SenseNet.Search
         void Set(string value);
     }
 
-
+    /// <summary>
+    /// Defines query operations for general purposes.
+    /// </summary>
     public interface IQueryEngine
     {
+        /// <summary>
+        /// Returns with the permitted hit collection defined in the query.
+        /// If there is any problem, throws an exception.
+        /// </summary>
+        /// <param name="query">Defines the query.</param>
+        /// <param name="filter">Supports mermission check methods.</param>
+        /// <param name="context">Contains additional data required to execution.</param>
+        /// <returns>
+        /// Contains two properties:
+        /// Hits: contains content identifier collection in the desired order defined in the query.
+        /// TotalCount: if the CountAllPages of the query is false, the TotalCount need to be the count of Hits
+        /// otherwise the count of hits without skip and top restrictions.
+        /// </returns>
         IQueryResult<int> ExecuteQuery(SnQuery query, IPermissionFilter filter, IQueryContext context);
+        /// <summary>
+        /// Returns with the permitted hit collection defined in the query.
+        /// Every hit is the matched content's field defined in the query's Projection property.
+        /// If there is any problem, throws an exception.
+        /// </summary>
+        /// <param name="query">Defines the query.</param>
+        /// <param name="filter">Supports mermission check methods.</param>
+        /// <param name="context">Contains additional data required to execution.</param>
+        /// <returns>
+        /// Contains two properties:
+        /// Hits: string value collection of the content property values.
+        /// Field name is defined in the query.Projection property.
+        /// Order of hits is defined in the query.
+        /// TotalCount: if the CountAllPages of the query is false, the TotalCount need to be the count of Hits
+        /// otherwise the count of hits without skip and top restrictions.
+        /// </returns>
         IQueryResult<string> ExecuteQueryAndProject(SnQuery query, IPermissionFilter filter, IQueryContext context);
     }
 
+    /// <summary>
+    /// Defines query operations for increasing performance purposes.
+    /// </summary>
+    public interface IMetaQueryEngine
+    {
+        /// <summary>
+        /// Returns with the permitted hit collection defined in the query.
+        /// If there is any problem or the query is not executable in this compinent, returns with null.
+        /// </summary>
+        /// <param name="query">Defines the query.</param>
+        /// <param name="filter">Supports mermission check methods.</param>
+        /// <param name="context">Contains additional data required to execution.</param>
+        /// <returns>
+        /// Contains two properties:
+        /// Hits: contains content identifier collection in the desired order defined in the query.
+        /// TotalCount: if the CountAllPages of the query is false, the TotalCount need to be the count of Hits
+        /// otherwise the count of hits without skip and top restrictions.
+        /// </returns>
+        IQueryResult<int> TryExecuteQuery(SnQuery query, IPermissionFilter filter, IQueryContext context);
+        /// <summary>
+        /// Returns with the permitted hit collection defined in the query.
+        /// Every hit is the matched content's field defined in the query's Projection property.
+        /// If there is any problem or the query is not executable in this compinent, returns with null.
+        /// </summary>
+        /// <param name="query">Defines the query.</param>
+        /// <param name="filter">Supports mermission check methods.</param>
+        /// <param name="context">Contains additional data required to execution.</param>
+        /// <returns>
+        /// Contains two properties:
+        /// Hits: string value collection of the content property values.
+        /// Field name is defined in the query.Projection property.
+        /// Order of hits is defined in the query.
+        /// TotalCount: if the CountAllPages of the query is false, the TotalCount need to be the count of Hits
+        /// otherwise the count of hits without skip and top restrictions.
+        /// </returns>
+        IQueryResult<string> TryExecuteQueryAndProject(SnQuery query, IPermissionFilter filter, IQueryContext context);
+    }
+
+    /// <summary>
+    /// Defines a permission checker method for authorize the query hit candidates.
+    /// </summary>
     public interface IPermissionFilter
     {
+        /// <summary>
+        /// Authorizes a query hit candidate.
+        /// </summary>
         bool IsPermitted(int nodeId, bool isLastPublic, bool isLastDraft);
     }
     public interface IPermissionFilterFactory
     {
+        [Obsolete("", true)]
         IPermissionFilter Create(int userId);
+        IPermissionFilter Create(SnQuery query, IQueryContext context);
     }
 
     public interface IQueryResult<out T>
     {
         IEnumerable<T> Hits { get; }
         int TotalCount { get; }
-    }
-
-
-    public class DefaultPermissionFilter : IPermissionFilter //UNDONE: Delete DefaultPermissionFilter if the final version is done.
-    {
-        private readonly int _userId;
-
-        public DefaultPermissionFilter(int userId)
-        {
-            _userId = userId;
-        }
-        public bool IsPermitted(int nodeId, bool isLastPublic, bool isLastDraft)
-        {
-            return true; //UNDONE:!!! DefaultPermissionFilter: fake implementation
-        }
-    }
-
-    public class DefaultPermissionFilterFactory : IPermissionFilterFactory //UNDONE: Delete DefaultPermissionFilterFactory if the final version is done.
-    {
-        public IPermissionFilter Create(int userId)
-        {
-            return new DefaultPermissionFilter(userId);
-        }
     }
 
     public class DefaultQueryEngine : IQueryEngine //UNDONE: Delete DefaultQueryEngine if the final version is done.

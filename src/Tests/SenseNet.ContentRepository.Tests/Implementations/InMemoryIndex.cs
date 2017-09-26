@@ -8,11 +8,15 @@ namespace SenseNet.ContentRepository.Tests.Implementations
 {
     public class InMemoryIndex
     {
+        /* ========================================================================== Data */
+
         // FieldName => FieldValue => VersionId
         internal Dictionary<string, Dictionary<string, List<int>>> IndexData { get; } = new Dictionary<string, Dictionary<string, List<int>>>();
 
         // VersionId, IndexFields
         internal List<Tuple<int, List<IndexField>>> StoredData { get; } = new List<Tuple<int, List<IndexField>>>();
+
+        /* ========================================================================== Operations */
 
         public void AddDocument(IndexDocument document)
         {
@@ -125,7 +129,7 @@ namespace SenseNet.ContentRepository.Tests.Implementations
         {
             var fieldValues = new List<string>();
 
-            if (field.Name == IndexFieldName.AllText) //UNDONE: Need to use analyzer
+            if (field.Name == IndexFieldName.AllText) //UNDONE: TEST: Need to use analyzer
             {
                 var words = field.StringValue.Split("\t\r\n".ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
                 fieldValues.AddRange(words);
@@ -160,5 +164,30 @@ namespace SenseNet.ContentRepository.Tests.Implementations
             IndexData.Clear();
             StoredData.Clear();
         }
+
+        /* ========================================================================== Activity staus */
+
+        private class ActivityStatus : IIndexingActivityStatus
+        {
+            public int LastActivityId { get; set; }
+            public int[] Gaps { get; set; }
+        }
+
+        private ActivityStatus _activityStatux = new ActivityStatus { LastActivityId = 0, Gaps = new int[0] };
+
+        internal void WriteActivityStatus(IIndexingActivityStatus status)
+        {
+            _activityStatux = new ActivityStatus
+            {
+                LastActivityId = status.LastActivityId,
+                Gaps = status.Gaps.ToArray()
+            };
+        }
+
+        internal IIndexingActivityStatus ReadActivityStatus()
+        {
+            return _activityStatux;
+        }
+
     }
 }

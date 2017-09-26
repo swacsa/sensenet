@@ -16,6 +16,7 @@ namespace SenseNet.Search.Indexing
         #region /* ==================================================================== Managing index */
 
         internal static IIndexingEngine IndexingEngine => StorageContext.Search.SearchEngine.IndexingEngine;
+        internal static ICommitManager CommitManager { get; } = new NoDelayCommitManager();
 
         public static bool Running => IndexingEngine.Running;
 
@@ -27,10 +28,12 @@ namespace SenseNet.Search.Indexing
         public static void Start(TextWriter consoleOut)
         {
             IndexingEngine.Start(consoleOut);
+            CommitManager.Start();
         }
 
         public static void ShutDown()
         {
+            CommitManager.ShutDown();
             IndexingEngine.ShutDown();
             SnLog.WriteInformation("Indexing engine has stopped. Max task id and exceptions: " + IndexingActivityQueue.GetCurrentCompletionState());
         }
@@ -56,14 +59,14 @@ namespace SenseNet.Search.Indexing
             // data of the activity to prevent memory overflow. We still have to wait for the 
             // activity to finish, but the inner data can (and will) be loaded from the db when 
             // the time comes for this activity to be executed.
-            if (IndexingActivityQueue.IsOverloaded()) //UNDONE:!!!! Decision: execution without queue
+            if (IndexingActivityQueue.IsOverloaded())
             {
                 SnTrace.Index.Write("IAQ OVERLOAD drop activity FromPopulator A:" + activity.Id);
                 activity.IndexDocumentData = null;
             }
 
             // all activities must be executed through the activity queue's API
-            IndexingActivityQueue.ExecuteActivity(activity); //UNDONE:!!!! Decision: execution without queue
+            IndexingActivityQueue.ExecuteActivity(activity);
 
             if (waitForComplete)
                 activity.WaitForComplete();
@@ -83,11 +86,11 @@ namespace SenseNet.Search.Indexing
 
         internal static void ActivityFinished(int activityId, bool executingUnprocessedActivities)
         {
-            IndexingEngine.ActivityFinished();
+            CommitManager.ActivityFinished();
         }
-        internal static void Commit(int lastActivityId = 0)
+        internal static void Commit()
         {
-            IndexingEngine.Commit(lastActivityId);
+            IndexingEngine.WriteActivityStatusToIndex(CompletionState.GetCurrent());
         }
 
         #endregion
@@ -133,7 +136,7 @@ namespace SenseNet.Search.Indexing
             return true;
         }
         // RemoveDocumentActivity
-        internal static bool DeleteDocument(int versionId, VersioningInfo versioning)
+        internal static bool DeleteDocument(int versionId, VersioningInfo versioning) //UNDONE:!!!!!!!! RemoveDocumentActivity: Unused method
         {
             var delTerms = versioning.Delete.Select(i => new SnTerm(IndexFieldName.VersionId, i)).ToList();
             delTerms.Add(new SnTerm(IndexFieldName.VersionId, versionId));

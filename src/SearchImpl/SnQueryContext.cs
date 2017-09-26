@@ -1,4 +1,5 @@
 ﻿using SenseNet.ContentRepository.Storage;
+using SenseNet.ContentRepository.Storage.Data;
 
 namespace SenseNet.Search
 {
@@ -7,7 +8,8 @@ namespace SenseNet.Search
         public QuerySettings Settings { get; }
         public int UserId { get; }
         public IQueryEngine QueryEngine => StorageContext.Search.SearchEngine.QueryEngine;
-        public bool AllVersions { get; set; }
+        public IMetaQueryEngine MetaQueryEngine => DataProvider.Current.MetaQueryEngine;
+        public bool AllVersions { get; set; } //UNDONE:!!!!! tusmester API: TEST: AllVersions: Move to QuerySettings.
 
         public SnQueryContext(QuerySettings settings, int userId)
         {

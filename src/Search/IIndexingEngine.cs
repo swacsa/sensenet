@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace SenseNet.Search
@@ -20,20 +21,13 @@ namespace SenseNet.Search
         bool Running { get; }
 
         void Start(TextWriter consoleOut);
-
         void ShutDown();
-
-        void ActivityFinished(); //UNDONE:!!!!! Remove if possible
-        void Commit(int lastActivityId = 0); //UNDONE:!!!!! Remove if possible
-
         void ClearIndex();
 
         IIndexingActivityStatus ReadActivityStatusFromIndex();
-        void WriteActivityStatusToIndex(IIndexingActivityStatus state); //UNDONE:!!!!! Finalize/Validate this method (not called)
+        void WriteActivityStatusToIndex(IIndexingActivityStatus state);
 
-        /// <summary>Only for tests.</summary>
-        IEnumerable<IndexDocument> GetDocumentsByNodeId(int nodeId); //UNDONE:!!!!! Remove if possible
-
+        //UNDONE:!!!!! tusmester API: Merge methods: WriteIndex
         void WriteIndex(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates);
         void WriteIndex(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> addition);
     }

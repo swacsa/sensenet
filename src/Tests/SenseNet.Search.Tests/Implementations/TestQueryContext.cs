@@ -14,19 +14,21 @@ namespace SenseNet.Search.Tests.Implementations
         public QuerySettings Settings { get; }
         public int UserId { get; }
         public IQueryEngine QueryEngine { get; }
-        public bool AllVersions { get; set; }
+        public IMetaQueryEngine MetaQueryEngine { get; }
+        public bool AllVersions { get; set; } //UNDONE:!!!!! tusmester API: TEST: AllVersions: Move to QuerySettings.
 
         public IPerFieldIndexingInfo GetPerFieldIndexingInfo(string fieldName)
         {
             return _indexingInfo[fieldName];
         }
 
-        public TestQueryContext(QuerySettings settings, int userId, IDictionary<string, IPerFieldIndexingInfo> indexingInfo, IQueryEngine queryEngine = null)
+        public TestQueryContext(QuerySettings settings, int userId, IDictionary<string, IPerFieldIndexingInfo> indexingInfo, IQueryEngine queryEngine = null, IMetaQueryEngine metaQueryEngine = null)
         {
             Settings = settings;
             UserId = userId;
             _indexingInfo = indexingInfo;
             QueryEngine = queryEngine;
+            MetaQueryEngine = metaQueryEngine;
         }
     }
 }

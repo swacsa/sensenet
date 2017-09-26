@@ -13,12 +13,15 @@ using SenseNet.ContentRepository.Storage.Data;
 using SenseNet.ContentRepository.Storage.Data.SqlClient;
 using SenseNet.ContentRepository.Storage.Schema;
 using SenseNet.Diagnostics;
+using SenseNet.Search;
 using SenseNet.Security;
 
 namespace SenseNet.ContentRepository.Tests.Implementations
 {
     public partial class InMemoryDataProvider : DataProvider
     {
+        public override IMetaQueryEngine MetaQueryEngine { get { return null; } }
+
         #region NOT IMPLEMENTED
 
         public override System.Collections.Generic.Dictionary<DataType, int> ContentListMappingOffsets
@@ -895,6 +898,7 @@ namespace SenseNet.ContentRepository.Tests.Implementations
             return _db.Nodes.Select(n => new StoredSecurityEntity
             {
                 Id = n.NodeId,
+                IsInherited = true,
                 nullableOwnerId = n.OwnerId,
                 nullableParentId = n.ParentNodeId
             }).ToArray();
