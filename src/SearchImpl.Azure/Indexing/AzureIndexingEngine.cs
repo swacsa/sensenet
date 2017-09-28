@@ -46,12 +46,6 @@ namespace SenseNet.Search.Azure.Indexing
         {
             //_queryExecutor = new AzureQueryExecutor(new AzureQueryEngine());
             _queryEngine = queryEngine;
-            //_status = status;
-            //_credentials = new SearchCredentials(_apiKey);
-            //_indexClient = new SearchIndexClient(_serviceName, _indexName, _credentials);
-            //_indexClient.BaseUri = new Uri(_schema + _serviceName + "." + _dnsSuffix + _indexName);
-            //_indexClient.LongRunningOperationRetryTimeout = _operationTimeout;
-            //_documents = _indexClient.Documents;
             _documents = documents;
             _manager = manager;
         }
