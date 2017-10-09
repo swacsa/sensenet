@@ -271,7 +271,9 @@ namespace SenseNet.Search.Lucene29
         public IndexingActivityStatus ReadActivityStatusFromIndex()
         {
             using (var readerFrame = GetIndexReaderFrame())
+            {
                 return CompletionState.ParseFromReader(readerFrame.IndexReader);
+            }
         }
 
         public void WriteActivityStatusToIndex(IndexingActivityStatus state)

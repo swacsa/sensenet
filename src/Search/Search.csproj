@@ -73,6 +73,7 @@
     <Compile Include="Parser\Predicates\LogicalPredicate.cs" />
     <Compile Include="IQueryContext.cs" />
     <Compile Include="Parser\Predicates\RangePredicate.cs" />
+    <Compile Include="Parser\QueryContext.cs" />
     <Compile Include="Parser\SnQueryPredicate.cs" />
     <Compile Include="Parser\CqlLexer.cs" />
     <Compile Include="Parser\LineInfo.cs" />

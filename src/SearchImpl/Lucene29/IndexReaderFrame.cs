@@ -24,5 +24,6 @@ namespace SenseNet.Search.Lucene29
         {
             return ((Lucene29IndexingEngine)IndexManager.IndexingEngine).GetIndexReaderFrame(dirty);
         }
+
     }
 }

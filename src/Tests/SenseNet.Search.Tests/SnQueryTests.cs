@@ -232,7 +232,7 @@ namespace SenseNet.Search.Tests
             };
             SnQuery.PrepareQuery(query, context);
 
-            var visitor = new SnQueryToStringVisitor();
+            var visitor = new Implementations.SnQueryToStringVisitor();
             visitor.Visit(query.QueryTree);
 
             return new Tuple<SnQuery, string>(query, visitor.Output);

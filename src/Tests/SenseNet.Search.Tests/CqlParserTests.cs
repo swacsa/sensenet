@@ -294,7 +294,7 @@ namespace SenseNet.Search.Tests
 
             var snQuery = parser.Parse(queryText, queryContext);
 
-            var visitor = new SnQueryToStringVisitor();
+            var visitor = new Implementations.SnQueryToStringVisitor();
             visitor.Visit(snQuery.QueryTree);
             var actualResult = visitor.Output;
 
@@ -391,7 +391,7 @@ namespace SenseNet.Search.Tests
 
                 var snQuery = parser.Parse(inputQueryText, queryContext);
 
-                var visitor = new SnQueryToStringVisitor();
+                var visitor = new Implementations.SnQueryToStringVisitor();
                 visitor.Visit(snQuery.QueryTree);
                 var actualResultText = visitor.Output;
 

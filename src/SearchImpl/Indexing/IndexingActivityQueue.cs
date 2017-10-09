@@ -815,7 +815,7 @@ namespace SenseNet.Search.Indexing
         {
             return ParseFromReader(reader.GetCommitUserData());
         }
-        internal static CompletionState ParseFromReader(IDictionary<string, string> commitUserData)
+        public static CompletionState ParseFromReader(IDictionary<string, string> commitUserData)
         {
             var result = new CompletionState();
             if (commitUserData != null)

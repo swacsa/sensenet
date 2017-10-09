@@ -45,7 +45,7 @@ namespace SenseNet.Search.Tests
             var visitor = new TestVisitor();
             var rewritten = visitor.Visit(tree);
 
-            var dumper = new SnQueryToStringVisitor();
+            var dumper = new Implementations.SnQueryToStringVisitor();
             dumper.Visit(rewritten);
 
             Assert.AreEqual("+(F1:V1 F2:V2222) +(F3:V3 F4:<10)", dumper.Output);
