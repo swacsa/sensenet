@@ -102,10 +102,6 @@
       <Project>{0279705B-779D-485D-86B9-F7AB3DD1F2C3}</Project>
       <Name>Search</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Tests\SenseNet.Search.Tests\SenseNet.Search.Tests.csproj">
-      <Project>{0C78C008-DB1D-4CE6-B081-A04AFDAF5880}</Project>
-      <Name>SenseNet.Search.Tests</Name>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

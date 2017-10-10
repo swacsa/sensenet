@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Search;
 using Microsoft.Azure.Search.Models;
+using SenseNet.ContentRepository.Storage.Search;
 using SenseNet.Search.Azure.Querying.Models;
 using SenseNet.Search.Parser;
 
@@ -72,20 +73,45 @@ namespace SenseNet.Search.Azure.Querying
             var result = Search(searchParameters);
             if (result != null)
             {
-                return new QueryResult<int>(result.Results.Select(r =>
-                {
-                    object value;
-                    r.Document.TryGetValue(IndexFieldName.VersionId, out value);
-                    return int.Parse(value.ToString());
-                }), result.Results.Count);
+                return new QueryResult<int>(result.Results
+                    .Where(r => filter.IsPermitted(int.Parse(r.Document[IndexFieldName.NodeId].ToString())
+                        , bool.Parse(r.Document[IndexFieldName.IsLastPublic].ToString())
+                        , bool.Parse(r.Document[IndexFieldName.IsLastDraft].ToString())))
+                    .Select(r =>
+                        {
+                            object value;
+                            r.Document.TryGetValue(IndexFieldName.VersionId, out value);
+                            return int.Parse(value.ToString());
+                        })
+                    , result.Results.Count);
             }
             return null;
         }
 
         public IQueryResult<string> ExecuteQueryAndProject(SnQuery query, IPermissionFilter filter, IQueryContext context)
         {
-            throw new NotImplementedException();
+            var searchParameters = _compiler.Compile(query, context);
+            var projection = query.Projection ?? IndexFieldName.NodeId;
+            var converter = !(context.GetPerFieldIndexingInfo(projection).IndexFieldHandler is IIndexValueConverter indexFieldHandler) 
+                ? DefaultConverter : indexFieldHandler.GetBack;
+            var result = Search(searchParameters);
+            if (result != null)
+            {
+                var hits = result.Results?
+                    .Where(r => filter.IsPermitted(int.Parse(r.Document[IndexFieldName.NodeId].ToString())
+                                   , bool.Parse(r.Document[IndexFieldName.IsLastPublic].ToString())
+                                   , bool.Parse(r.Document[IndexFieldName.IsLastDraft].ToString())))
+                    .Select(x => x.Document[projection].ToString())
+                    .Where(r => !string.IsNullOrEmpty(r))
+                    .Select(q => converter(q).ToString())
+                    .ToArray()
+                    ?? new string[0];
+                return new QueryResult<string>(hits, result.Results.Count);
+            }
+            return null;
         }
+
+        private static readonly Func<string, object> DefaultConverter = s => s;
         #endregion
     }
 }

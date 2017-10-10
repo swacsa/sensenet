@@ -9,7 +9,7 @@ using SenseNet.Search.Parser.Predicates;
 
 namespace SenseNet.Search.Azure.Querying
 {
-    internal class SnQueryToAzureQueryVisitor : SnQueryToStringVisitor
+    internal class SnQueryToAzureQueryVisitor : SnQueryVisitor
     {
         private int _booleanCount;
         private AzureSearchParameters _azureParameters;
@@ -34,13 +34,13 @@ namespace SenseNet.Search.Azure.Querying
             _azureParameters = azureParameters;
         }
 
-        public override SnQueryPredicate VisitTextPredicate(TextPredicate textPredicate)
+        public override SnQueryPredicate VisitTextPredicate(SimplePredicate textPredicate)
         {
             if (textPredicate.FieldName != "_Text")
             {
                 _searchText.Append($"{textPredicate.FieldName.Replace("#", "")}:");
             }
-            var value = Escape(textPredicate.Value);
+            var value = Escape(textPredicate.Value.StringValue);
             var phrase = value.WordCount() > 1;
             if (phrase)
             {

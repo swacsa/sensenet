@@ -138,7 +138,7 @@ namespace SenseNet.Search.Azure.Indexing
         {
         }
 
-        public IIndexingActivityStatus ReadActivityStatusFromIndex()
+        public IndexingActivityStatus ReadActivityStatusFromIndex()
         {
             _statusLock.EnterReadLock();
             try
@@ -160,7 +160,7 @@ namespace SenseNet.Search.Azure.Indexing
             }
         }
 
-        public void WriteActivityStatusToIndex(IIndexingActivityStatus state)
+        public void WriteActivityStatusToIndex(IndexingActivityStatus state)
         {
             _statusLock.EnterWriteLock();
             try
@@ -232,15 +232,20 @@ namespace SenseNet.Search.Azure.Indexing
             return document;
         }
 
-        public void WriteIndex(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates)
+        public void WriteIndex(IEnumerable<SnTerm> deletions, IEnumerable<DocumentUpdate> updates, IEnumerable<IndexDocument> addition)
         {
-            Actualize(deletions, addition == null ? null : new [] {addition}, updates);
-        }
+            Actualize(deletions, addition , updates);
 
-        public void WriteIndex(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> additions)
-        {
-            Actualize(deletions, additions, null);
         }
+        //public void WriteIndex(IEnumerable<SnTerm> deletions, IndexDocument addition, IEnumerable<DocumentUpdate> updates)
+        //{
+        //    Actualize(deletions, addition == null ? null : new [] {addition}, updates);
+        //}
+
+        //public void WriteIndex(IEnumerable<SnTerm> deletions, IEnumerable<IndexDocument> additions)
+        //{
+        //    Actualize(deletions, additions, null);
+        //}
 
         public void ClearIndex()
         {
@@ -327,7 +332,7 @@ namespace SenseNet.Search.Azure.Indexing
             var filterText = new StringBuilder();
             filter = "";
 
-            if (term.Type == SnTermType.StringArray)
+            if (term.Type == IndexValueType.StringArray)
             {
                 filterText.Append("search.in(");
                 filterText.Append(term.Name);
@@ -350,7 +355,7 @@ namespace SenseNet.Search.Azure.Indexing
             searchText.Append($"{term.Name.Replace("#", "")}:");
             switch (term.Type)
             {
-                case SnTermType.String:
+                case IndexValueType.String:
                     var phrase = term.StringValue.WordCount() > 1;
                     if (phrase)
                     {
@@ -362,17 +367,17 @@ namespace SenseNet.Search.Azure.Indexing
                         searchText.Append("\"");
                     }
                     break;
-                case SnTermType.Bool:
+                case IndexValueType.Bool:
                     searchText.Append(term.BooleanValue);break;
-                case SnTermType.Int:
+                case IndexValueType.Int:
                     searchText.Append(term.IntegerValue);break;
-                case SnTermType.Long:
+                case IndexValueType.Long:
                     searchText.Append(term.LongValue);break;
-                case SnTermType.Float:
+                case IndexValueType.Float:
                     searchText.Append(term.SingleValue);break;
-                case SnTermType.Double:
+                case IndexValueType.Double:
                     searchText.Append(term.DoubleValue);break;
-                case SnTermType.DateTime:
+                case IndexValueType.DateTime:
                     searchText.Append(GetODataV4DateTimeUtcString(term.DateTimeValue)); break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -386,6 +391,7 @@ namespace SenseNet.Search.Azure.Indexing
             var result = $"{utc.Year}-{utc.Month}-{utc.Day}T{utc.Hour.ToString("D2")}:{utc.Minute.ToString("D2")}:{utc.Second.ToString("D2")}.{utc.Millisecond}Z";
             return result;
         }
+
 
         #endregion
     }

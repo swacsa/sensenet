@@ -81,7 +81,10 @@ namespace Sensenet.Search.Azure.Tests
                 updateable.Add(new IndexField("Name", "ContentName", IndexingMode.NotAnalyzed, IndexStoringMode.Yes, IndexTermVector.Default));
                 updateables.Add(new DocumentUpdate { Document = updateable, UpdateTerm = new SnTerm("", "") });
             }
-            indexingEngine.WriteIndex(deletions, addable, updateables);
+            var adds = new List<IndexDocument>();
+            adds.Add(addable);
+
+            indexingEngine.WriteIndex(deletions, updateables, adds );
 
             mockQueryEngine.Verify(o => o.GetDocuments(It.IsAny<AzureSearchParameters>()), Times.Once);
             mockDocuments.Verify(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)), Times.Once);
@@ -148,7 +151,10 @@ namespace Sensenet.Search.Azure.Tests
                 updateable.Add(new IndexField("Name", "ContentName", IndexingMode.NotAnalyzed, IndexStoringMode.Yes, IndexTermVector.Default));
                 updateables.Add(new DocumentUpdate { Document = updateable, UpdateTerm = new SnTerm("", "") });
             }
-            indexingEngine.WriteIndex(deletions, addable, updateables);
+            var adds = new List<IndexDocument>();
+            adds.Add(addable);
+
+            indexingEngine.WriteIndex(deletions, updateables, adds);
 
             mockQueryEngine.Verify(o => o.GetDocuments(It.IsAny<AzureSearchParameters>()), Times.Once);
             mockDocuments.Verify(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)), Times.Once);
@@ -289,7 +295,10 @@ namespace Sensenet.Search.Azure.Tests
                 updateable.Add(new IndexField("Name", "ContentName", IndexingMode.NotAnalyzed, IndexStoringMode.Yes, IndexTermVector.Default));
                 updateables.Add(new DocumentUpdate { Document = updateable, UpdateTerm = new SnTerm("", "") });
             }
-            indexingEngine.WriteIndex(deletions, addable, updateables);
+            var adds = new List<IndexDocument>();
+            adds.Add(addable);
+
+            indexingEngine.WriteIndex(deletions, updateables, adds);
 
             mockQueryEngine.Verify(o => o.GetDocuments(It.IsAny<AzureSearchParameters>()), Times.Once);
             mockDocuments.Verify(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)), Times.Once);
@@ -376,7 +385,10 @@ namespace Sensenet.Search.Azure.Tests
                 updateable.Add(new IndexField("Name", "ContentName", IndexingMode.NotAnalyzed, IndexStoringMode.Yes, IndexTermVector.Default));
                 updateables.Add(new DocumentUpdate { Document = updateable, UpdateTerm = new SnTerm("", "") });
             }
-            indexingEngine.WriteIndex(deletions, addable, updateables);
+            var adds = new List<IndexDocument>();
+            adds.Add(addable);
+
+            indexingEngine.WriteIndex(deletions, updateables, adds);
 
             mockQueryEngine.Verify(o => o.GetDocuments(It.IsAny<AzureSearchParameters>()), Times.Once);
             mockDocuments.Verify(o => o.IndexWithHttpMessagesAsync(It.IsAny<IndexBatch<IndexDocument>>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)), Times.Exactly(2));
@@ -454,7 +466,10 @@ namespace Sensenet.Search.Azure.Tests
             }
             try
             {
-                indexingEngine.WriteIndex(deletions, addable, updateables);
+                var adds = new List<IndexDocument>();
+                adds.Add(addable);
+
+                indexingEngine.WriteIndex(deletions, updateables, adds);
             }
             catch (Exception ex)
             {
@@ -504,7 +519,7 @@ namespace Sensenet.Search.Azure.Tests
             var batch = default(IndexBatch<IndexDocument>);
             int[] gaps = { 1, 2 };
             var lastActivity = 3;
-            IIndexingActivityStatus status = new IndexingActivityStatus { LastActivityId = lastActivity, Gaps = gaps };
+            IndexingActivityStatus status = new IndexingActivityStatus { LastActivityId = lastActivity, Gaps = gaps };
             var mockDocuments = new Mock<IDocumentsOperations>();
 
             var indexResult = new AzureOperationResponse<DocumentIndexResult>();

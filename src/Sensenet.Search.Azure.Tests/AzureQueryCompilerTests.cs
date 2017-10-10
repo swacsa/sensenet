@@ -2,11 +2,11 @@
 using System.Globalization;
 using SenseNet.Search;
 using SenseNet.Search.Parser;
-using SenseNet.Search.Tests.Implementations;
 using Xunit;
 using SenseNet.Search.Azure.Querying.Models;
 using System.Linq;
 using SenseNet.Search.Azure.Querying;
+using SenseNet.Search.Indexing;
 
 namespace Sensenet.Search.Azure.Tests
 {
@@ -100,9 +100,9 @@ namespace Sensenet.Search.Azure.Tests
         {
 
             IDictionary<string, IPerFieldIndexingInfo> indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>();
-            indexingInfo.Add("Id", new TestPerfieldIndexingInfoInt());
-            indexingInfo.Add("Name", new TestPerfieldIndexingInfoString());
-            indexingInfo.Add("Value", new TestPerfieldIndexingInfoSingle());
+            indexingInfo.Add("Id", new PerFieldIndexingInfo());
+            indexingInfo.Add("Name", new PerFieldIndexingInfo());
+            indexingInfo.Add("Value", new PerFieldIndexingInfo());
             IQueryContext queryContext = new QueryContext(QuerySettings.Default, 0, indexingInfo);
             var parser = new CqlParser();
             var snQuery = parser.Parse(queryText, queryContext);
@@ -117,9 +117,9 @@ namespace Sensenet.Search.Azure.Tests
         private AzureSearchParameters RangeTest(string queryText, string expected = null)
         {
             IDictionary<string, IPerFieldIndexingInfo> indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>();
-            indexingInfo.Add("Id", new TestPerfieldIndexingInfoInt());
-            indexingInfo.Add("Name", new TestPerfieldIndexingInfoString());
-            indexingInfo.Add("Value", new TestPerfieldIndexingInfoSingle());
+            indexingInfo.Add("Id", new PerFieldIndexingInfo());
+            indexingInfo.Add("Name", new PerFieldIndexingInfo());
+            indexingInfo.Add("Value", new PerFieldIndexingInfo());
             IQueryContext queryContext = new QueryContext(QuerySettings.Default, 0, indexingInfo);
             var parser = new CqlParser();
             var snQuery = parser.Parse(queryText, queryContext);

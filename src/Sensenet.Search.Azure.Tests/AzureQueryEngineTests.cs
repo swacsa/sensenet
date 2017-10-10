@@ -10,6 +10,7 @@ using Moq;
 using SenseNet.Search;
 using SenseNet.Search.Azure.Querying;
 using SenseNet.Search.Azure.Querying.Models;
+using SenseNet.Search.Indexing;
 using SenseNet.Search.Parser;
 using Xunit;
 
@@ -49,8 +50,11 @@ namespace Sensenet.Search.Azure.Tests
             searchResult.Body = new DocumentSearchResult();
             searchResult.Body.Results = new List<SearchResult>();
             var document = new Document();
+            document.Add("Id", 1);
             document.Add("VersionId", "12");
             document.Add("Name", "ContentName");
+            document.Add("IsLastPublic", true);
+            document.Add("IsLastDraft", true);
             searchResult.Body.Results.Add(new SearchResult { Document = document });
             var searchTask = Task.FromResult(searchResult);
             mockDocuments.Setup(o => o.SearchWithHttpMessagesAsync(It.IsAny<string>(), It.IsAny<SearchParameters>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)))
@@ -71,8 +75,7 @@ namespace Sensenet.Search.Azure.Tests
             var mockCompiler = new Mock<IQueryCompiler>();
             var searchParameters = new AzureSearchParameters();
             mockCompiler.Setup(o => o.Compile(It.IsAny<SnQuery>(), It.IsAny<IQueryContext>())).Returns(searchParameters);
-            //IQueryEngine 
-            var engine = new AzureQueryEngine(mockClient.Object, mockCompiler.Object);
+            IQueryEngine engine = new AzureQueryEngine(mockClient.Object, mockCompiler.Object);
             SnQuery query = new SnQuery();
             query.Querytext = "";
             IDictionary<string, IPerFieldIndexingInfo> indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>();
@@ -90,5 +93,206 @@ namespace Sensenet.Search.Azure.Tests
             Assert.Equal(1000, parameters.Top);
         }
 
+        [Fact]
+        public void ExecuteQueryWithNullResultTest()
+        {
+            string text;
+            var parameters = new SearchParameters();
+            var mockContext = new Mock<IQueryContext>();
+            var mockDocuments = new Mock<IDocumentsOperations>();
+            var searchResult = new AzureOperationResponse<DocumentSearchResult>();
+            var searchTask = Task.FromResult(searchResult);
+            mockDocuments.Setup(o => o.SearchWithHttpMessagesAsync(It.IsAny<string>(), It.IsAny<SearchParameters>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)))
+                .Returns(searchTask).Callback((string st, SearchParameters p, SearchRequestOptions o, Dictionary<string, List<string>> c, CancellationToken t) =>
+                {
+                    text = st;
+                    parameters = p;
+                });
+            var mockClient = new Mock<ISearchIndexClient>();
+            mockClient.SetupGet(o => o.Documents).Returns(mockDocuments.Object);
+            QuerySettings settings = null;
+            mockContext.SetupGet(o => o.Settings).Returns(settings);
+            mockContext.SetupGet(o => o.UserId).Returns(1);
+            mockContext.Setup(o => o.GetPerFieldIndexingInfo(It.IsAny<string>())).Returns((IPerFieldIndexingInfo)null);
+            var mockPermissionFilter = new Mock<IPermissionFilter>();
+            mockPermissionFilter.Setup(o => o.IsPermitted(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<bool>())).Returns(true);
+            var mockCompiler = new Mock<IQueryCompiler>();
+            var searchParameters = new AzureSearchParameters();
+            mockCompiler.Setup(o => o.Compile(It.IsAny<SnQuery>(), It.IsAny<IQueryContext>())).Returns(searchParameters);
+            IQueryEngine engine = new AzureQueryEngine(mockClient.Object, mockCompiler.Object);
+            SnQuery query = new SnQuery();
+            query.Querytext = "";
+            IDictionary<string, IPerFieldIndexingInfo> indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>();
+            IQueryContext context = new QueryContext(QuerySettings.Default, 0, indexingInfo);
+
+            var result = engine.ExecuteQuery(query, mockPermissionFilter.Object, context);
+
+            Assert.Null(result);
+            Assert.Equal(null, parameters.Filter);
+            Assert.Equal(false, parameters.IncludeTotalResultCount);
+            Assert.Equal(QueryType.Full, parameters.QueryType);
+            Assert.Equal(SearchMode.All, parameters.SearchMode);
+            Assert.Equal(null, parameters.Skip);
+            Assert.Equal(1000, parameters.Top);
+        }
+
+        [Fact]
+        public void ExecuteQueryAndProjectTest()
+        {
+            string text;
+            var parameters = new SearchParameters();
+            var mockContext = new Mock<IQueryContext>();
+            var mockDocuments = new Mock<IDocumentsOperations>();
+            var searchResult = new AzureOperationResponse<DocumentSearchResult>();
+            searchResult.Body = new DocumentSearchResult();
+            searchResult.Body.Results = new List<SearchResult>();
+            var document = new Document();
+            document.Add("Id", 1);
+            document.Add("VersionId", "12");
+            document.Add("Name", "ContentName");
+            document.Add("IsLastPublic", true);
+            document.Add("IsLastDraft", true);
+            searchResult.Body.Results.Add(new SearchResult { Document = document });
+            var searchTask = Task.FromResult(searchResult);
+            mockDocuments.Setup(o => o.SearchWithHttpMessagesAsync(It.IsAny<string>(), It.IsAny<SearchParameters>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)))
+                .Returns(searchTask).Callback((string st, SearchParameters p, SearchRequestOptions o, Dictionary<string, List<string>> c, CancellationToken t) =>
+                {
+                    text = st;
+                    parameters = p;
+                });
+            var mockClient = new Mock<ISearchIndexClient>();
+            mockClient.SetupGet(o => o.Documents).Returns(mockDocuments.Object);
+            QuerySettings settings = null;
+            mockContext.SetupGet(o => o.Settings).Returns(settings);
+            mockContext.SetupGet(o => o.UserId).Returns(1);
+            mockContext.Setup(o => o.GetPerFieldIndexingInfo(It.IsAny<string>())).Returns((IPerFieldIndexingInfo)null);
+            var mockPermissionFilter = new Mock<IPermissionFilter>();
+            mockPermissionFilter.Setup(o => o.IsPermitted(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<bool>())).Returns(true);
+            var mockCompiler = new Mock<IQueryCompiler>();
+            var searchParameters = new AzureSearchParameters();
+            mockCompiler.Setup(o => o.Compile(It.IsAny<SnQuery>(), It.IsAny<IQueryContext>())).Returns(searchParameters);
+            //IQueryEngine 
+            var engine = new AzureQueryEngine(mockClient.Object, mockCompiler.Object);
+            SnQuery query = new SnQuery();
+            query.Querytext = "";
+            query.Projection = "Name";
+            IDictionary<string, IPerFieldIndexingInfo> indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>();
+            indexingInfo.Add("Name", new PerFieldIndexingInfo());
+            IQueryContext context = new QueryContext(QuerySettings.Default, 0, indexingInfo);
+
+            var result = engine.ExecuteQueryAndProject(query, mockPermissionFilter.Object, context);
+
+            Assert.Equal(1, result.Hits.Count());
+            Assert.Equal(1, result.TotalCount);
+            Assert.Equal("ContentName", result.Hits.ToArray()[0]);
+            Assert.Equal(null, parameters.Filter);
+            Assert.Equal(false, parameters.IncludeTotalResultCount);
+            Assert.Equal(QueryType.Full, parameters.QueryType);
+            Assert.Equal(SearchMode.All, parameters.SearchMode);
+            Assert.Equal(null, parameters.Skip);
+            Assert.Equal(1000, parameters.Top);
+        }
+
+        [Fact]
+        public void ExecuteQueryAndProjectWithoutProjectionTest()
+        {
+            string text;
+            var parameters = new SearchParameters();
+            var mockContext = new Mock<IQueryContext>();
+            var mockDocuments = new Mock<IDocumentsOperations>();
+            var searchResult = new AzureOperationResponse<DocumentSearchResult>();
+            searchResult.Body = new DocumentSearchResult();
+            searchResult.Body.Results = new List<SearchResult>();
+            var document = new Document();
+            document.Add("Id", 1);
+            document.Add("VersionId", "12");
+            document.Add("Name", "ContentName");
+            document.Add("IsLastPublic", true);
+            document.Add("IsLastDraft", true);
+            searchResult.Body.Results.Add(new SearchResult { Document = document });
+            var searchTask = Task.FromResult(searchResult);
+            mockDocuments.Setup(o => o.SearchWithHttpMessagesAsync(It.IsAny<string>(), It.IsAny<SearchParameters>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)))
+                .Returns(searchTask).Callback((string st, SearchParameters p, SearchRequestOptions o, Dictionary<string, List<string>> c, CancellationToken t) =>
+                {
+                    text = st;
+                    parameters = p;
+                });
+            var mockClient = new Mock<ISearchIndexClient>();
+            mockClient.SetupGet(o => o.Documents).Returns(mockDocuments.Object);
+            QuerySettings settings = null;
+            mockContext.SetupGet(o => o.Settings).Returns(settings);
+            mockContext.SetupGet(o => o.UserId).Returns(1);
+            mockContext.Setup(o => o.GetPerFieldIndexingInfo(It.IsAny<string>())).Returns((IPerFieldIndexingInfo)null);
+            var mockPermissionFilter = new Mock<IPermissionFilter>();
+            mockPermissionFilter.Setup(o => o.IsPermitted(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<bool>())).Returns(true);
+            var mockCompiler = new Mock<IQueryCompiler>();
+            var searchParameters = new AzureSearchParameters();
+            mockCompiler.Setup(o => o.Compile(It.IsAny<SnQuery>(), It.IsAny<IQueryContext>())).Returns(searchParameters);
+            //IQueryEngine 
+            var engine = new AzureQueryEngine(mockClient.Object, mockCompiler.Object);
+            SnQuery query = new SnQuery();
+            query.Querytext = "";
+            IDictionary<string, IPerFieldIndexingInfo> indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>();
+            indexingInfo.Add("Id", new PerFieldIndexingInfo());
+            IQueryContext context = new QueryContext(QuerySettings.Default, 0, indexingInfo);
+
+            var result = engine.ExecuteQueryAndProject(query, mockPermissionFilter.Object, context);
+
+            Assert.Equal(1, result.Hits.Count());
+            Assert.Equal(1, result.TotalCount);
+            Assert.Equal("1", result.Hits.ToArray()[0]);
+            Assert.Equal(null, parameters.Filter);
+            Assert.Equal(false, parameters.IncludeTotalResultCount);
+            Assert.Equal(QueryType.Full, parameters.QueryType);
+            Assert.Equal(SearchMode.All, parameters.SearchMode);
+            Assert.Equal(null, parameters.Skip);
+            Assert.Equal(1000, parameters.Top);
+        }
+
+        [Fact]
+        public void ExecuteQueryAndProjectWithNullResultTest()
+        {
+            string text;
+            var parameters = new SearchParameters();
+            var mockContext = new Mock<IQueryContext>();
+            var mockDocuments = new Mock<IDocumentsOperations>();
+            var searchResult = new AzureOperationResponse<DocumentSearchResult>();
+            var searchTask = Task.FromResult(searchResult);
+            mockDocuments.Setup(o => o.SearchWithHttpMessagesAsync(It.IsAny<string>(), It.IsAny<SearchParameters>(), It.IsAny<SearchRequestOptions>(), null, default(CancellationToken)))
+                .Returns(searchTask).Callback((string st, SearchParameters p, SearchRequestOptions o, Dictionary<string, List<string>> c, CancellationToken t) =>
+                {
+                    text = st;
+                    parameters = p;
+                });
+            var mockClient = new Mock<ISearchIndexClient>();
+            mockClient.SetupGet(o => o.Documents).Returns(mockDocuments.Object);
+            QuerySettings settings = null;
+            mockContext.SetupGet(o => o.Settings).Returns(settings);
+            mockContext.SetupGet(o => o.UserId).Returns(1);
+            mockContext.Setup(o => o.GetPerFieldIndexingInfo(It.IsAny<string>())).Returns((IPerFieldIndexingInfo)null);
+            var mockPermissionFilter = new Mock<IPermissionFilter>();
+            mockPermissionFilter.Setup(o => o.IsPermitted(It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<bool>())).Returns(true);
+            var mockCompiler = new Mock<IQueryCompiler>();
+            var searchParameters = new AzureSearchParameters();
+            mockCompiler.Setup(o => o.Compile(It.IsAny<SnQuery>(), It.IsAny<IQueryContext>())).Returns(searchParameters);
+            //IQueryEngine 
+            var engine = new AzureQueryEngine(mockClient.Object, mockCompiler.Object);
+            SnQuery query = new SnQuery();
+            query.Querytext = "";
+            query.Projection = "Name";
+            IDictionary<string, IPerFieldIndexingInfo> indexingInfo = new Dictionary<string, IPerFieldIndexingInfo>();
+            indexingInfo.Add("Name", new PerFieldIndexingInfo());
+            IQueryContext context = new QueryContext(QuerySettings.Default, 0, indexingInfo);
+
+            var result = engine.ExecuteQueryAndProject(query, mockPermissionFilter.Object, context);
+
+            Assert.Null(result);
+            Assert.Equal(null, parameters.Filter);
+            Assert.Equal(false, parameters.IncludeTotalResultCount);
+            Assert.Equal(QueryType.Full, parameters.QueryType);
+            Assert.Equal(SearchMode.All, parameters.SearchMode);
+            Assert.Equal(null, parameters.Skip);
+            Assert.Equal(1000, parameters.Top);
+        }
     }
 }

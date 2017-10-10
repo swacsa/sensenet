@@ -66,6 +66,10 @@
     <Compile Include="VisitorTests.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\SearchImpl\SearchImpl.csproj">
+      <Project>{ff0b1af9-753b-4660-8bd0-b84492321808}</Project>
+      <Name>SearchImpl</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\Search\Search.csproj">
       <Project>{0279705b-779d-485d-86b9-f7ab3dd1f2c3}</Project>
       <Name>Search</Name>
