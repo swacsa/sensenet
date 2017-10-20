@@ -111,10 +111,6 @@
       <Project>{7DE6A7E8-5738-4436-9646-9C1179F752EA}</Project>
       <Name>SenseNet.ContentRepository.Tests</Name>
     </ProjectReference>
-    <ProjectReference Include="..\SenseNet.Search.Tests\SenseNet.Search.Tests.csproj">
-      <Project>{0c78c008-db1d-4ce6-b081-a04afdaf5880}</Project>
-      <Name>SenseNet.Search.Tests</Name>
-    </ProjectReference>
   </ItemGroup>
   <Choose>
     <When Condition="'$(VisualStudioVersion)' == '10.0' And '$(IsCodedUITest)' == 'True'">
